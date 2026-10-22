@@ -9,6 +9,9 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="log/activity" />
+        <Stack.Screen name="log/details" />
+        <Stack.Screen name="log/review" />
       </Stack>
     </ThemeProvider>
   );
