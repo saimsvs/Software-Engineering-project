@@ -25,15 +25,18 @@ export default function DetailsScreen() {
   const activity = ACTIVITIES.find((a) => a.id === activityId) ?? ACTIVITIES[0];
 
   const [distance, setDistance] = useState("");
-  const [unit, setUnit] = useState<"km" | "miles">("km");
+  const [unit, setUnit] = useState<string>(
+    activity.category === "Transport" ? "km" : activity.unit
+  );
   const [note, setNote] = useState("");
+  const isTransport = activity.category === "Transport";
 
   const emission = calcEmission(activity, distance, unit);
 
   const onNext = () => {
     const d = parseFloat(distance);
     if (!d || d <= 0) {
-      Alert.alert("Enter distance", "Type how far you travelled.");
+      Alert.alert("Enter a value", isTransport ? "Type how far you travelled." : "Type the amount used.");
       return;
     }
     router.push({
@@ -63,7 +66,7 @@ export default function DetailsScreen() {
           </View>
         </View>
 
-        <Text style={styles.label}>Distance</Text>
+        <Text style={styles.label}>{isTransport ? "Distance" : "Amount"}</Text>
         <View style={styles.distanceRow}>
           <TextInput
             style={styles.distanceInput}
@@ -78,25 +81,29 @@ export default function DetailsScreen() {
           </View>
         </View>
 
-        <Text style={styles.subLabel}>How far did you travel?</Text>
-        <View style={styles.unitToggle}>
-          {(["km", "miles"] as const).map((u) => (
-            <TouchableOpacity
-              key={u}
-              style={[styles.unitPill, unit === u && styles.unitPillActive]}
-              onPress={() => setUnit(u)}
-            >
-              <Text style={[styles.unitPillText, unit === u && styles.unitPillTextActive]}>
-                {u}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <Text style={styles.subLabel}>
+          {isTransport ? "How far did you travel?" : `How much did you use? (${activity.unit})`}
+        </Text>
+        {isTransport && (
+          <View style={styles.unitToggle}>
+            {(["km", "miles"] as const).map((u) => (
+              <TouchableOpacity
+                key={u}
+                style={[styles.unitPill, unit === u && styles.unitPillActive]}
+                onPress={() => setUnit(u)}
+              >
+                <Text style={[styles.unitPillText, unit === u && styles.unitPillTextActive]}>
+                  {u}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         <View style={styles.emissionBox}>
           <Text style={styles.emissionLabel}>Estimated Emission</Text>
           <Text style={styles.emissionValue}>{emission} kg CO2e</Text>
-          <Text style={styles.emissionMeta}>Factor: {activity.factor} kg CO2e/km</Text>
+          <Text style={styles.emissionMeta}>Factor: {activity.factor} kg CO2e/{activity.unit}</Text>
           <Text style={styles.emissionMeta}>Source: DEFRA 2024</Text>
         </View>
 

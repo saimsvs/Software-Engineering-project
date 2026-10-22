@@ -86,15 +86,16 @@ router.get("/me", requireAuth, async (req, res) => {
 });
 
 
-
 const activitySchema = z.object({
   activityId: z.string().min(1),
   category: z.string().min(1),
   distance: z.number().positive(),
-  unit: z.enum(["km", "miles"]),
+  unit: z.string().min(1),
   note: z.string().max(500).optional(),
 });
+
 const FACTORS: Record<string, number> = {
+  // Transport (per km)
   "car-petrol": 0.192,
   "car-electric": 0.05,
   bus: 0.089,
@@ -103,6 +104,19 @@ const FACTORS: Record<string, number> = {
   "flight-intl": 0.195,
   motorcycle: 0.113,
   taxi: 0.148,
+  // Energy
+  electricity: 0.207,
+  "natural-gas": 2.04,
+  "heating-oil": 2.54,
+  // Food
+  "beef-meal": 2.7,
+  "chicken-meal": 1.4,
+  "veggie-meal": 0.7,
+  milk: 0.32,
+  // Waste
+  "general-waste": 0.5,
+  "plastic-waste": 1.5,
+  "paper-waste": 0.9,
 };
 
 // POST /api/auth/activity — save one activity (protected)

@@ -1,6 +1,8 @@
 import { StepIndicator } from "@/components/step-indicator";
 import { ACTIVITIES, calcEmission } from "@/data/activities";
+import { apiFetch } from "@/utils/api";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -27,12 +29,37 @@ export default function ReviewScreen() {
   }>();
 
   const activity = ACTIVITIES.find((a) => a.id === activityId) ?? ACTIVITIES[0];
-  const emission = calcEmission(activity, distance ?? "0", (unit as "km" | "miles") ?? "km");
+  const isTransport = activity.category === "Transport";
+  const emission = calcEmission(activity, distance ?? "0", unit ?? "km");
+  const [saving, setSaving] = useState(false);
 
-  const onSave = () => {
-    Alert.alert("Saved", "Activity saved to your history.", [
-      { text: "OK", onPress: () => router.replace("/home") },
-    ]);
+  const onSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const res = await apiFetch("/api/auth/activity", {
+        method: "POST",
+        body: JSON.stringify({
+          activityId: activity.id,
+          category: activity.category,
+          distance: parseFloat(distance ?? "0"),
+          unit,
+          note: note || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        Alert.alert("Error", data.message || "Could not save activity");
+        return;
+      }
+      Alert.alert("Saved", "Activity saved to your history.", [
+        { text: "OK", onPress: () => router.replace("/home") },
+      ]);
+    } catch {
+      Alert.alert("Error", "Cannot connect to server");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -58,16 +85,18 @@ export default function ReviewScreen() {
               <Text style={styles.badgeText}>{activity.category}</Text>
             </View>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unit}</Text>
+              <Text style={styles.badgeText}>{isTransport ? unit : activity.unit}</Text>
             </View>
           </View>
 
-          <Text style={styles.row}>Distance: {distance} km</Text>
+          <Text style={styles.row}>
+            {isTransport ? `Distance: ${distance} ${unit}` : `Amount: ${distance} ${activity.unit}`}
+          </Text>
 
           <View style={styles.emissionBox}>
             <Text style={styles.emissionLabel}>ESTIMATED EMISSION</Text>
             <Text style={styles.emissionValue}>{emission} kg CO2e</Text>
-            <Text style={styles.emissionMeta}>Factor: {activity.factor} kg CO2e/km</Text>
+            <Text style={styles.emissionMeta}>Factor: {activity.factor} kg CO2e/{activity.unit}</Text>
             <Text style={styles.emissionMeta}>Source: DEFRA 2024</Text>
           </View>
 
@@ -80,8 +109,13 @@ export default function ReviewScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.saveBtn} activeOpacity={0.85} onPress={onSave}>
-          <Text style={styles.saveText}>✓ Save Activity</Text>
+        <TouchableOpacity
+          style={[styles.saveBtn, saving && { opacity: 0.6 }]}
+          activeOpacity={0.85}
+          onPress={onSave}
+          disabled={saving}
+        >
+          <Text style={styles.saveText}>{saving ? "Saving…" : "✓ Save Activity"}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.editBtn}
