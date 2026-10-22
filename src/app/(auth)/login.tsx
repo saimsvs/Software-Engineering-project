@@ -1,15 +1,15 @@
+import { Logo } from "@/components/logo";
+import { API_URL } from "@/config/api";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  View,
+  Alert,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { Logo } from "@/components/logo";
-
 const DARK = "#1A1A1A";
 
 export default function LoginScreen() {
@@ -27,7 +27,7 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:3000/api/auth/login", {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -40,7 +40,7 @@ export default function LoginScreen() {
       }
 
       Alert.alert("Success", "Logged in!");
-      router.replace("/");
+      router.replace("/home");
     } catch {
       Alert.alert("Error", "Cannot connect to server");
     } finally {

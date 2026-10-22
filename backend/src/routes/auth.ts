@@ -1,9 +1,10 @@
-import { Router } from "express";
 import bcrypt from "bcrypt";
+import { Router } from "express";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { prisma } from "../config/db.js";
 import { env } from "../config/env.js";
+import { requireAuth } from "../middleware/auth.js";
 const router = Router();
 
 const registerSchema = z.object({
@@ -21,7 +22,9 @@ const loginSchema = z.object({
 router.post("/register", async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ message: "Invalid input", errors: parsed.error.flatten() });
+    return res
+      .status(400)
+      .json({ message: "Invalid input", errors: parsed.error.flatten() });
   }
 
   const { name, email, password } = parsed.data;
@@ -37,7 +40,9 @@ router.post("/register", async (req, res) => {
     select: { id: true, name: true, email: true, createdAt: true },
   });
 
-  const token = jwt.sign({ userId: user.id }, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
+  const token = jwt.sign({ userId: user.id }, env.jwtSecret, {
+    expiresIn: env.jwtExpiresIn,
+  });
 
   res.status(201).json({ user, token });
 });
@@ -61,12 +66,23 @@ router.post("/login", async (req, res) => {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
-  const token = jwt.sign({ userId: user.id }, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
+  const token = jwt.sign({ userId: user.id }, env.jwtSecret, {
+    expiresIn: env.jwtExpiresIn,
+  });
 
   res.json({
     user: { id: user.id, name: user.name, email: user.email },
     token,
   });
+});
+
+router.get("/me", requireAuth, async (req, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.userId },
+    select: { id: true, name: true, email: true, createdAt: true },
+  });
+  if (!user) return res.status(404).json({ message: "User not found" });
+  res.json({ user });
 });
 
 export default router;

@@ -1,15 +1,16 @@
+import { Logo } from "@/components/logo";
+import { API_URL } from "@/config/api";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  View,
+  Alert,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ScrollView,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { Logo } from "@/components/logo";
 
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
@@ -41,7 +42,7 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:3000/api/auth/register", {
+      const res = await fetch(`${API_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),
@@ -54,7 +55,7 @@ export default function RegisterScreen() {
       }
 
       Alert.alert("Success", "Account created!", [
-        { text: "OK", onPress: () => router.push("/login") },
+        { text: "OK", onPress: () => router.replace("/home") },
       ]);
     } catch {
       Alert.alert("Error", "Cannot connect to server");
