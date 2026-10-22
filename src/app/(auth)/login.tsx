@@ -1,5 +1,6 @@
 import { Logo } from "@/components/logo";
 import { API_URL } from "@/config/api";
+import { saveToken } from "@/utils/storage";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -39,6 +40,7 @@ export default function LoginScreen() {
         return;
       }
 
+      await saveToken(data.token);
       Alert.alert("Success", "Logged in!");
       router.replace("/home");
     } catch {
