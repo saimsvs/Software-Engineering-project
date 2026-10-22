@@ -14,4 +14,20 @@ model User {
   passwordHash String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  activityLogs ActivityLog[]
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activityId String
+  category   String
+  distance   Float
+  unit       String
+  emission   Float
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
 }
