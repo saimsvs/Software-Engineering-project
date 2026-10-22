@@ -85,4 +85,67 @@ router.get("/me", requireAuth, async (req, res) => {
   res.json({ user });
 });
 
+
+
+const activitySchema = z.object({
+  activityId: z.string().min(1),
+  category: z.string().min(1),
+  distance: z.number().positive(),
+  unit: z.enum(["km", "miles"]),
+  note: z.string().max(500).optional(),
+});
+const FACTORS: Record<string, number> = {
+  "car-petrol": 0.192,
+  "car-electric": 0.05,
+  bus: 0.089,
+  train: 0.041,
+  "flight-dom": 0.255,
+  "flight-intl": 0.195,
+  motorcycle: 0.113,
+  taxi: 0.148,
+};
+
+// POST /api/auth/activity — save one activity (protected)
+router.post("/activity", requireAuth, async (req, res) => {
+  const parsed = activitySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ message: "Invalid input", errors: parsed.error.flatten() });
+  }
+
+  const { activityId, category, distance, unit, note } = parsed.data;
+  const factor = FACTORS[activityId];
+  if (!factor) {
+    return res.status(400).json({ message: "Unknown activity type" });
+  }
+
+  const km = unit === "miles" ? distance * 1.60934 : distance;
+  const emission = Math.round(km * factor * 10) / 10;
+
+  const activity = await prisma.activityLog.create({
+    data: {
+      userId: req.userId!,
+      activityId,
+      category,
+      distance,
+      unit,
+      emission,
+      note: note || null,
+    },
+  });
+
+  res.status(201).json({ activity });
+});
+
+// GET /api/auth/activity — user's recent activities (protected)
+router.get("/activity", requireAuth, async (req, res) => {
+  const activities = await prisma.activityLog.findMany({
+    where: { userId: req.userId },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+  });
+  res.json({ activities });
+});
+
 export default router;
