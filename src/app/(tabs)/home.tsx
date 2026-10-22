@@ -1,4 +1,7 @@
+import { ACTIVITIES } from "@/data/activities";
+import { apiFetch } from "@/utils/api";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -18,14 +21,64 @@ const WEEK = [
   { day: "Sun", h: 70, today: true, value: "4.2" },
 ];
 
-const RECENT = [
-  { emoji: "🚗", name: "Car (Petrol)", time: "Today • 8:30 AM", kg: "19.2 kg" },
-  { emoji: "🚌", name: "Bus", time: "Yesterday • 5:15 PM", kg: "2.7 kg" },
-  { emoji: "✈️", name: "Flight (Dom.)", time: "Oct 18 • 7:00 AM", kg: "96.4 kg" },
+type RecentItem = {
+  id: string;
+  emoji: string;
+  name: string;
+  time: string;
+  kg: string;
+};
+
+const SAMPLE: RecentItem[] = [
+  { id: "s1", emoji: "🚗", name: "Car (Petrol)", time: "Today • 8:30 AM", kg: "19.2 kg" },
+  { id: "s2", emoji: "🚌", name: "Bus", time: "Yesterday • 5:15 PM", kg: "2.7 kg" },
+  { id: "s3", emoji: "✈️", name: "Flight (Dom.)", time: "Oct 18 • 7:00 AM", kg: "96.4 kg" },
 ];
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (sameDay) return `Today • ${time}`;
+  if (d.toDateString() === yesterday.toDateString()) return `Yesterday • ${time}`;
+  return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })} • ${time}`;
+}
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [recent, setRecent] = useState<RecentItem[]>(SAMPLE);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/auth/activity");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!alive || !Array.isArray(data.activities)) return;
+        setRecent(
+          data.activities.map((a: any) => {
+            const meta = ACTIVITIES.find((x) => x.id === a.activityId);
+            return {
+              id: a.id,
+              emoji: meta?.emoji ?? "🌿",
+              name: meta?.name ?? a.activityId,
+              time: formatTime(a.createdAt),
+              kg: `${a.emission} kg`,
+            };
+          })
+        );
+      } catch {
+        // keep sample on failure
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -87,8 +140,11 @@ export default function HomeScreen() {
 
         <Text style={styles.sectionTitle}>Recent Activities</Text>
 
-        {RECENT.map((a) => (
-          <View key={a.name} style={styles.activityRow}>
+        {recent.length === 0 && (
+          <Text style={styles.emptyText}>No activities yet — tap “+ Log Activity”</Text>
+        )}
+        {recent.map((a) => (
+          <View key={a.id} style={styles.activityRow}>
             <View style={styles.emojiCircle}>
               <Text style={styles.emoji}>{a.emoji}</Text>
             </View>
@@ -207,4 +263,5 @@ const styles = StyleSheet.create({
   activityName: { fontSize: 15, fontWeight: "600", color: DARK },
   activityTime: { fontSize: 12, color: GRAY, marginTop: 2 },
   activityKg: { fontSize: 14, fontWeight: "bold", color: GREEN },
+  emptyText: { fontSize: 14, color: GRAY, textAlign: "center", marginVertical: 16 },
 });
