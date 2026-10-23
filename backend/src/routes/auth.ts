@@ -162,4 +162,20 @@ router.get("/activity", requireAuth, async (req, res) => {
   res.json({ activities });
 });
 
+// DELETE /api/auth/activity/:id — delete one of MY activities (protected)
+router.delete("/activity/:id", requireAuth, async (req, res) => {
+  const id = String(req.params.id);
+
+  // security: only delete if the row belongs to this user
+  const existing = await prisma.activityLog.findFirst({
+    where: { id, userId: req.userId },
+  });
+  if (!existing) {
+    return res.status(404).json({ message: "Activity not found" });
+  }
+
+  await prisma.activityLog.delete({ where: { id } });
+  res.json({ message: "Deleted", id });
+});
+
 export default router;
