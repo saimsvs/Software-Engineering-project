@@ -6,7 +6,6 @@ import {
   Alert,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -27,7 +26,6 @@ export default function ProfileScreen() {
   const [daysActive, setDaysActive] = useState(1);
   const [totalKg, setTotalKg] = useState(0);
   const [activityCount, setActivityCount] = useState(0);
-  const [notifications, setNotifications] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -153,19 +151,6 @@ export default function ProfileScreen() {
             value="km"
             onPress={() => Alert.alert("Units", "Default: km")}
           />
-          <Row
-            icon="🔔"
-            label="Notifications"
-            right={
-              <Switch
-                value={notifications}
-                onValueChange={setNotifications}
-                trackColor={{ true: GREEN, false: "#CCC" }}
-                thumbColor="#FFF"
-              />
-            }
-          />
-          <Row icon="🔒" label="Privacy" onPress={() => Alert.alert("Privacy", "Coming soon")} />
         </View>
 
         <Text style={styles.sectionTitle}>Account</Text>
