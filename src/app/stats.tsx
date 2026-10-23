@@ -38,7 +38,6 @@ export default function StatsScreen() {
   const router = useRouter();
   const [activities, setActivities] = useState<Act[]>([]);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState<"week" | "all">("week");
 
   useEffect(() => {
     (async () => {
@@ -57,10 +56,9 @@ export default function StatsScreen() {
   }, []);
 
   const filtered = useMemo(() => {
-    if (range === "all") return activities;
     const weekAgo = Date.now() - 7 * 86400000;
     return activities.filter((a) => new Date(a.createdAt).getTime() >= weekAgo);
-  }, [activities, range]);
+  }, [activities]);
 
   const totalKg = useMemo(
     () => Math.round(filtered.reduce((s, a) => s + a.emission, 0) * 10) / 10,
@@ -106,19 +104,7 @@ export default function StatsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.pills}>
-          {(["week", "all"] as const).map((r) => (
-            <TouchableOpacity
-              key={r}
-              style={[styles.pill, range === r && styles.pillActive]}
-              onPress={() => setRange(r)}
-            >
-              <Text style={[styles.pillText, range === r && styles.pillTextActive]}>
-                {r === "week" ? "This Week" : "All Time"}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <Text style={styles.rangeLabel}>Last 7 days</Text>
 
         {loading ? (
           <ActivityIndicator color={GREEN} style={{ marginTop: 40 }} />
@@ -206,18 +192,13 @@ const styles = StyleSheet.create({
 
   content: { paddingHorizontal: 20, paddingBottom: 32 },
 
-  pills: { flexDirection: "row", gap: 8, marginBottom: 16 },
-  pill: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 999,
-    paddingVertical: 8,
-    alignItems: "center",
+  rangeLabel: {
+    fontSize: 13,
+    color: GRAY,
+    marginBottom: 14,
+    textAlign: "center",
+    fontWeight: "600",
   },
-  pillActive: { backgroundColor: LIGHT_GREEN, borderColor: GREEN },
-  pillText: { fontSize: 14, color: GRAY, fontWeight: "600" },
-  pillTextActive: { color: GREEN },
 
   summaryRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
   summaryBox: {
