@@ -16,6 +16,5 @@
     "node_modules",
     "dist",
     "generated"
-  ],
-  "extends": "expo/tsconfig.base"
+  ]
 }
