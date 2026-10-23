@@ -144,7 +144,9 @@ export default function HomeScreen() {
 
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>This Week</Text>
-          <Text style={styles.link}>See All</Text>
+          <TouchableOpacity onPress={() => router.push("/stats")}>
+            <Text style={styles.link}>See All</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.chartCard}>

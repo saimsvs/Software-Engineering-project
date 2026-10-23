@@ -153,11 +153,13 @@ router.post("/activity", requireAuth, async (req, res) => {
 });
 
 // GET /api/auth/activity — user's recent activities (protected)
+// ?all=1 → return everything (for stats), otherwise latest 10
 router.get("/activity", requireAuth, async (req, res) => {
+  const all = req.query.all === "1";
   const activities = await prisma.activityLog.findMany({
     where: { userId: req.userId },
     orderBy: { createdAt: "desc" },
-    take: 10,
+    take: all ? 1000 : 10,
   });
   res.json({ activities });
 });
