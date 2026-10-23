@@ -110,8 +110,7 @@ export default function HomeScreen() {
       >
         <View style={styles.greetingRow}>
           <View>
-            <Text style={styles.greeting}>Good morning 👋</Text>
-            <Text style={styles.name}>Saim</Text>
+            <Text style={styles.brand}>🍃 CarbonTrail</Text>
           </View>
           <TouchableOpacity
             style={styles.avatar}
@@ -205,6 +204,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   greeting: { fontSize: 14, color: GRAY },
+  brand: { fontSize: 24, fontWeight: "bold", color: GREEN },
   name: { fontSize: 24, fontWeight: "bold", color: DARK, marginTop: 2 },
   avatar: {
     width: 40,
