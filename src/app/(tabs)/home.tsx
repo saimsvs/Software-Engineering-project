@@ -1,3 +1,4 @@
+import { Logo } from "@/components/logo";
 import { ACTIVITIES } from "@/data/activities";
 import { apiFetch } from "@/utils/api";
 import { useRouter } from "expo-router";
@@ -109,8 +110,9 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.greetingRow}>
-          <View>
-            <Text style={styles.brand}>🍃 CarbonTrail</Text>
+          <View style={styles.brandRow}>
+            <Logo size={32} />
+            <Text style={styles.brand}>CarbonTrail</Text>
           </View>
           <TouchableOpacity
             style={styles.avatar}
@@ -204,7 +206,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   greeting: { fontSize: 14, color: GRAY },
-  brand: { fontSize: 24, fontWeight: "bold", color: GREEN },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  brand: { fontSize: 22, fontWeight: "bold", color: GREEN },
   name: { fontSize: 24, fontWeight: "bold", color: DARK, marginTop: 2 },
   avatar: {
     width: 40,
