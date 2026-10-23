@@ -1,8 +1,8 @@
 import { ACTIVITIES } from "@/data/activities";
 import { apiFetch } from "@/utils/api";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const GREEN = "#2E7D32";
@@ -51,34 +51,56 @@ export default function HomeScreen() {
   const router = useRouter();
   const [recent, setRecent] = useState<RecentItem[]>(SAMPLE);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const res = await apiFetch("/api/auth/activity");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!alive || !Array.isArray(data.activities)) return;
-        setRecent(
-          data.activities.map((a: any) => {
-            const meta = ACTIVITIES.find((x) => x.id === a.activityId);
-            return {
-              id: a.id,
-              emoji: meta?.emoji ?? "🌿",
-              name: meta?.name ?? a.activityId,
-              time: formatTime(a.createdAt),
-              kg: `${a.emission} kg`,
-            };
-          })
-        );
-      } catch {
-        // keep sample on failure
-      }
-    })();
-    return () => {
-      alive = false;
-    };
+  const loadRecent = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/auth/activity");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!Array.isArray(data.activities)) return;
+      setRecent(
+        data.activities.map((a: any) => {
+          const meta = ACTIVITIES.find((x) => x.id === a.activityId);
+          return {
+            id: a.id,
+            emoji: meta?.emoji ?? "🌿",
+            name: meta?.name ?? a.activityId,
+            time: formatTime(a.createdAt),
+            kg: `${a.emission} kg`,
+          };
+        })
+      );
+    } catch {
+      // keep current list on failure
+    }
   }, []);
+
+  useEffect(() => {
+    loadRecent();
+  }, [loadRecent]);
+
+  const onDelete = (item: RecentItem) => {
+    Alert.alert("Delete activity?", `${item.name} • ${item.kg}`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const res = await apiFetch(`/api/auth/activity/${item.id}`, {
+              method: "DELETE",
+            });
+            if (res.ok) {
+              setRecent((prev) => prev.filter((x) => x.id !== item.id));
+            } else {
+              Alert.alert("Error", "Could not delete");
+            }
+          } catch {
+            Alert.alert("Error", "Cannot connect to server");
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -91,7 +113,11 @@ export default function HomeScreen() {
             <Text style={styles.greeting}>Good morning 👋</Text>
             <Text style={styles.name}>Saim</Text>
           </View>
-          <TouchableOpacity style={styles.avatar} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.avatar}
+            activeOpacity={0.7}
+            onPress={() => router.push("/profile")}
+          >
             <Text style={styles.avatarIcon}>👤</Text>
           </TouchableOpacity>
         </View>
@@ -153,6 +179,13 @@ export default function HomeScreen() {
               <Text style={styles.activityTime}>{a.time}</Text>
             </View>
             <Text style={styles.activityKg}>{a.kg}</Text>
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={() => onDelete(a)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.deleteIcon}>✕</Text>
+            </TouchableOpacity>
           </View>
         ))}
       </ScrollView>
@@ -263,5 +296,15 @@ const styles = StyleSheet.create({
   activityName: { fontSize: 15, fontWeight: "600", color: DARK },
   activityTime: { fontSize: 12, color: GRAY, marginTop: 2 },
   activityKg: { fontSize: 14, fontWeight: "bold", color: GREEN },
+  deleteBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#F5F5F5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  deleteIcon: { fontSize: 12, color: "#999" },
   emptyText: { fontSize: 14, color: GRAY, textAlign: "center", marginVertical: 16 },
 });

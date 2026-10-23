@@ -12,6 +12,7 @@ export default function RootLayout() {
         <Stack.Screen name="log/activity" />
         <Stack.Screen name="log/details" />
         <Stack.Screen name="log/review" />
+        <Stack.Screen name="profile" />
       </Stack>
     </ThemeProvider>
   );
