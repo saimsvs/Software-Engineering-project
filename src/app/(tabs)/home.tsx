@@ -2,8 +2,16 @@ import { Logo } from "@/components/logo";
 import { ACTIVITIES } from "@/data/activities";
 import { apiFetch } from "@/utils/api";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  PanResponder,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const GREEN = "#2E7D32";
@@ -98,6 +106,21 @@ function formatTime(iso: string): string {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const navigateToLog = useCallback(() => router.push("/log/activity"), [router]);
+
+  // Swipe left or right anywhere on Home → open the Log Activity flow.
+  // Capture phase: grab horizontal gestures before the vertical ScrollView claims them;
+  // vertical moves (dy dominant) fall through so normal scrolling still works.
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_evt, gesture) =>
+        Math.abs(gesture.dx) > 24 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+      onPanResponderRelease: (_evt, gesture) => {
+        if (Math.abs(gesture.dx) > 60) navigateToLog();
+      },
+    })
+  ).current;
+
   const [recent, setRecent] = useState<RecentItem[]>([]);
   const [todayKg, setTodayKg] = useState(0);
   const [yesterdayKg, setYesterdayKg] = useState(0);
@@ -183,7 +206,7 @@ const onEdit=(item: RecentItem)=>{
 };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} {...panResponder.panHandlers}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
