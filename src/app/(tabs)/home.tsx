@@ -3,7 +3,14 @@ import { ACTIVITIES } from "@/data/activities";
 import { apiFetch } from "@/utils/api";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const GREEN = "#2E7D32";
