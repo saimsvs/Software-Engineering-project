@@ -21,11 +21,12 @@ const GRAY = "#666";
 
 export default function ReviewScreen() {
   const router = useRouter();
-  const { activity: activityId, distance, unit, note } = useLocalSearchParams<{
+  const { activity: activityId, distance, unit, note, editId } = useLocalSearchParams<{
     activity: string;
     distance: string;
     unit: string;
     note?: string;
+    editId?: string;
   }>();
 
   const activity = ACTIVITIES.find((a) => a.id === activityId) ?? ACTIVITIES[0];
@@ -37,24 +38,31 @@ export default function ReviewScreen() {
     if (saving) return;
     setSaving(true);
     try {
-      const res = await apiFetch("/api/auth/activity", {
-        method: "POST",
-        body: JSON.stringify({
-          activityId: activity.id,
-          category: activity.category,
-          distance: parseFloat(distance ?? "0"),
-          unit,
-          note: note || undefined,
-        }),
-      });
+      const res = await apiFetch(
+        editId ? `/api/auth/activity/${editId}` : "/api/auth/activity",
+        {
+          method: editId ? "PATCH" : "POST",
+          body: JSON.stringify({
+            activityId: activity.id,
+            category: activity.category,
+            distance: parseFloat(distance ?? "0"),
+            unit,
+            note: note || undefined,
+          }),
+        }
+      );
       const data = await res.json();
       if (!res.ok) {
         Alert.alert("Error", data.message || "Could not save activity");
         return;
       }
-      Alert.alert("Saved", "Activity saved to your history.", [
-        { text: "OK", onPress: () => router.replace("/home") },
-      ]);
+      Alert.alert(
+        editId ? "Updated" : "Saved",
+        editId ? "Activity updated in your history." : "Activity saved to your history.",
+        [
+          { text: "OK", onPress: () => router.replace("/home") },
+        ]
+      );
     } catch {
       Alert.alert("Error", "Cannot connect to server");
     } finally {
@@ -115,7 +123,9 @@ export default function ReviewScreen() {
           onPress={onSave}
           disabled={saving}
         >
-          <Text style={styles.saveText}>{saving ? "Saving…" : "✓ Save Activity"}</Text>
+          <Text style={styles.saveText}>
+            {saving ? "Saving…" : editId ? "✓ Save Changes" : "✓ Save Activity"}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.editBtn}
