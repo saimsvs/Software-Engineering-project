@@ -12,15 +12,7 @@ const LIGHT_GREEN = "#E8F5E9";
 const BORDER = "#E0E0E0";
 const GRAY = "#666";
 
-const WEEK = [
-  { day: "Mon", h: 40 },
-  { day: "Tue", h: 55 },
-  { day: "Wed", h: 30 },
-  { day: "Thu", h: 62 },
-  { day: "Fri", h: 48 },
-  { day: "Sat", h: 20 },
-  { day: "Sun", h: 70, today: true, value: "4.2" },
-];
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 type RecentItem = {
   id: string;
@@ -28,13 +20,69 @@ type RecentItem = {
   name: string;
   time: string;
   kg: string;
+  activityId: string;   // ← add
+  distance: number;     // ← add
+  unit: string;         // ← add
+  note: string | null;  // ← add
 };
 
-const SAMPLE: RecentItem[] = [
-  { id: "s1", emoji: "🚗", name: "Car (Petrol)", time: "Today • 8:30 AM", kg: "19.2 kg" },
-  { id: "s2", emoji: "🚌", name: "Bus", time: "Yesterday • 5:15 PM", kg: "2.7 kg" },
-  { id: "s3", emoji: "✈️", name: "Flight (Dom.)", time: "Oct 18 • 7:00 AM", kg: "96.4 kg" },
-];
+type LogEntry = {
+  id: string;
+  activityId: string;
+  distance: number;
+  unit: string;
+  note: string | null;
+  createdAt: string;
+  emission: number;
+};
+
+type Bar = {
+  day: string;
+  h: number;
+  total: number;
+  today: boolean;
+};
+
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+// Monday 00:00 of the week containing d
+function startOfWeek(d: Date): Date {
+  const s = new Date(d);
+  s.setHours(0, 0, 0, 0);
+  s.setDate(s.getDate() - ((s.getDay() + 6) % 7));
+  return s;
+}
+
+function sumDay(entries: LogEntry[], day: Date): number {
+  return entries
+    .filter((e) => sameDay(new Date(e.createdAt), day))
+    .reduce((total, e) => total + e.emission, 0);
+}
+
+// One bar per day (Mon–Sun), height scaled to the biggest day of the week
+function buildWeek(entries: LogEntry[]): Bar[] {
+  const now = new Date();
+  const start = startOfWeek(now);
+  const totals = DAYS.map((_, i) => {
+    const day = new Date(start);
+    day.setDate(start.getDate() + i);
+    return sumDay(entries, day);
+  });
+  const max = Math.max(...totals);
+  const todayIdx = (now.getDay() + 6) % 7; // getDay(): 0=Sun → 6, Mon→0
+  return totals.map((total, i) => ({
+    day: DAYS[i],
+    total,
+    h: max > 0 ? Math.max(4, Math.round((total / max) * 70)) : 4,
+    today: i === todayIdx,
+  }));
+}
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -50,16 +98,21 @@ function formatTime(iso: string): string {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [recent, setRecent] = useState<RecentItem[]>(SAMPLE);
+  const [recent, setRecent] = useState<RecentItem[]>([]);
+  const [todayKg, setTodayKg] = useState(0);
+  const [yesterdayKg, setYesterdayKg] = useState(0);
+  const [week, setWeek] = useState<Bar[]>(() => buildWeek([]));
 
-  const loadRecent = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
-      const res = await apiFetch("/api/auth/activity");
+      const res = await apiFetch("/api/auth/activity?all=1");
       if (!res.ok) return;
       const data = await res.json();
       if (!Array.isArray(data.activities)) return;
+      const entries: LogEntry[] = data.activities;
+
       setRecent(
-        data.activities.map((a: any) => {
+        entries.slice(0, 10).map((a) => {
           const meta = ACTIVITIES.find((x) => x.id === a.activityId);
           return {
             id: a.id,
@@ -67,17 +120,29 @@ export default function HomeScreen() {
             name: meta?.name ?? a.activityId,
             time: formatTime(a.createdAt),
             kg: `${a.emission} kg`,
+            activityId: a.activityId,   // ← add
+      distance: a.distance,       // ← add
+      unit: a.unit,               // ← add
+      note: a.note, 
           };
         })
       );
+
+      const now = new Date();
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+
+      setTodayKg(sumDay(entries, now));
+      setYesterdayKg(sumDay(entries, yesterday));
+      setWeek(buildWeek(entries));
     } catch {
       // keep current list on failure
     }
   }, []);
 
   useEffect(() => {
-    loadRecent();
-  }, [loadRecent]);
+    loadData();
+  }, [loadData]);
 
   const onDelete = (item: RecentItem) => {
     Alert.alert("Delete activity?", `${item.name} • ${item.kg}`, [
@@ -103,6 +168,20 @@ export default function HomeScreen() {
     ]);
   };
 
+const onEdit=(item: RecentItem)=>{
+  router.push({
+    pathname: "/log/activity",
+    params: {
+      editId: item.id,          // tells every screen "this is an edit"
+      activity: item.activityId,
+      distance: String(item.distance),
+      unit: item.unit,
+      note: item.note ?? "",
+    },
+  });
+
+};
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
@@ -126,12 +205,18 @@ export default function HomeScreen() {
         <View style={styles.hero}>
           <Text style={styles.heroLabel}>Today's Footprint</Text>
           <View style={styles.heroValueRow}>
-            <Text style={styles.heroValue}>4.2</Text>
+            <Text style={styles.heroValue}>{todayKg.toFixed(1)}</Text>
             <Text style={styles.heroUnit}>kg CO₂e</Text>
           </View>
-          <View style={styles.pill}>
-            <Text style={styles.pillText}>↓ 12% vs yesterday</Text>
-          </View>
+          {yesterdayKg > 0 && (
+            <View style={styles.pill}>
+              <Text style={styles.pillText}>
+                {todayKg <= yesterdayKg ? "↓" : "↑"}{" "}
+                {Math.abs(Math.round(((todayKg - yesterdayKg) / yesterdayKg) * 100))}%
+                vs yesterday
+              </Text>
+            </View>
+          )}
         </View>
 
         <TouchableOpacity
@@ -151,9 +236,9 @@ export default function HomeScreen() {
 
         <View style={styles.chartCard}>
           <View style={styles.barsRow}>
-            {WEEK.map((b) => (
+            {week.map((b) => (
               <View key={b.day} style={styles.barCol}>
-                {b.today && <Text style={styles.barValue}>{b.value}</Text>}
+                {b.today && <Text style={styles.barValue}>{b.total.toFixed(1)}</Text>}
                 <View
                   style={[
                     styles.bar,
@@ -173,6 +258,12 @@ export default function HomeScreen() {
           <Text style={styles.emptyText}>No activities yet — tap “+ Log Activity”</Text>
         )}
         {recent.map((a) => (
+            <TouchableOpacity
+    key={a.id}
+    style={styles.activityRow}      // styles move onto the touchable
+    activeOpacity={0.7}
+    onPress={() => onEdit(a)}       // your future edit handler
+  >
           <View key={a.id} style={styles.activityRow}>
             <View style={styles.emojiCircle}>
               <Text style={styles.emoji}>{a.emoji}</Text>
@@ -182,6 +273,7 @@ export default function HomeScreen() {
               <Text style={styles.activityTime}>{a.time}</Text>
             </View>
             <Text style={styles.activityKg}>{a.kg}</Text>
+            
             <TouchableOpacity
               style={styles.deleteBtn}
               onPress={() => onDelete(a)}
@@ -190,6 +282,7 @@ export default function HomeScreen() {
               <Text style={styles.deleteIcon}>✕</Text>
             </TouchableOpacity>
           </View>
+          </TouchableOpacity>
         ))}
       </ScrollView>
     </SafeAreaView>
