@@ -21,14 +21,20 @@ const GRAY = "#666";
 
 export default function DetailsScreen() {
   const router = useRouter();
-  const { activity: activityId } = useLocalSearchParams<{ activity: string }>();
+  const { activity: activityId, distance: startDistance, unit: startUnit, note: startNote, editId } =
+  useLocalSearchParams<{
+    activity: string;
+    distance?: string;
+    unit?: string;
+    note?: string;
+    editId?: string;
+  }>();
   const activity = ACTIVITIES.find((a) => a.id === activityId) ?? ACTIVITIES[0];
-
-  const [distance, setDistance] = useState("");
-  const [unit, setUnit] = useState<string>(
-    activity.category === "Transport" ? "km" : activity.unit
-  );
-  const [note, setNote] = useState("");
+const [distance, setDistance] = useState(startDistance ?? "");
+const [unit, setUnit] = useState<string>(
+  startUnit ?? (activity.category === "Transport" ? "km" : activity.unit)
+);
+const [note, setNote] = useState(startNote ?? "");
   const isTransport = activity.category === "Transport";
 
   const emission = calcEmission(activity, distance, unit);
@@ -41,7 +47,7 @@ export default function DetailsScreen() {
     }
     router.push({
       pathname: "/log/review",
-      params: { activity: activity.id, distance, unit, note },
+       params: { activity: activity.id, distance, unit, note, ...(editId ? { editId } : {}) },
     });
   };
 

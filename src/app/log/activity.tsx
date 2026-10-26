@@ -1,6 +1,6 @@
 import { StepIndicator } from "@/components/step-indicator";
 import { ACTIVITIES } from "@/data/activities";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
 const LIGHT_GREEN = "#E8F5E9";
@@ -21,9 +22,16 @@ const GRAY = "#666";
 const CATEGORIES = ["Transport", "Energy", "Food", "Waste"] as const;
 
 export default function ActivityScreen() {
-  const router = useRouter();
-  const [category, setCategory] = useState<string>("Transport");
-  const [selected, setSelected] = useState<string | null>(null);
+  const router = useRouter();const { editId, activity: activityId } = useLocalSearchParams<{
+  editId?: string;
+  activity?: string;
+}>();const incoming = activityId
+  ? ACTIVITIES.find((a) => a.id === activityId)
+  : undefined;
+
+const [category, setCategory] = useState<string>(incoming?.category ?? "Transport");
+const [selected, setSelected] = useState<string | null>(incoming?.id ?? null);
+
 
   const list = ACTIVITIES.filter((a) => a.category === category);
 
@@ -32,7 +40,7 @@ export default function ActivityScreen() {
       Alert.alert("Choose an activity", "Tap an activity card to select it.");
       return;
     }
-    router.push({ pathname: "/log/details", params: { activity: selected } });
+    router.push({ pathname: "/log/details", params: { activity: selected, ...(editId ? { editId } : {}) }});
   };
 
   return (

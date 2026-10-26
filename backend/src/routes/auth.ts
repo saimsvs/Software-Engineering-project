@@ -180,4 +180,41 @@ router.delete("/activity/:id", requireAuth, async (req, res) => {
   res.json({ message: "Deleted", id });
 });
 
+// PATCH /api/auth/activity/:id — edit one of MY activities (protected)
+router.patch("/activity/:id", requireAuth, async (req, res) => {
+  const id = String(req.params.id);
+
+  const parsed = activitySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ message: "Invalid input", errors: parsed.error.flatten() });
+  }
+
+  const { activityId, category, distance, unit, note } = parsed.data;
+  const factor = FACTORS[activityId];
+  if (!factor) {
+    return res.status(400).json({ message: "Unknown activity type" });
+  }
+
+  // security: only update if the row belongs to this user
+  const existing = await prisma.activityLog.findFirst({
+    where: { id, userId: req.userId },
+  });
+  if (!existing) {
+    return res.status(404).json({ message: "Activity not found" });
+  }
+
+  // emission always recomputed SERVER-side — never trust the client
+  const km = unit === "miles" ? distance * 1.60934 : distance;
+  const emission = Math.round(km * factor * 10) / 10;
+
+  const activity = await prisma.activityLog.update({
+    where: { id },
+    data: { activityId, category, distance, unit, emission, note: note || null },
+  });
+
+  res.json({ activity });
+});
+
 export default router;
