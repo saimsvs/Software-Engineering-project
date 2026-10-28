@@ -41,3 +41,7 @@ example
 # generated native folders
 /ios
 /android
+
+# prisma generated client
+backend/generated/
+backend/.agents/
