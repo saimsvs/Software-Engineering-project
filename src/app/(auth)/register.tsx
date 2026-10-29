@@ -55,9 +55,15 @@ export default function RegisterScreen() {
         return;
       }
 
-      await saveToken(data.token);
-      Alert.alert("Success", "Account created!", [
-        { text: "OK", onPress: () => router.replace("/home") },
+      Alert.alert("Success", "Verification code sent to your email!", [
+        {
+          text: "OK",
+          onPress: () =>
+            router.push({
+              pathname: "/verify-code",
+              params: { email },
+            }),
+        },
       ]);
     } catch {
       Alert.alert("Error", "Cannot connect to server");
