@@ -1,6 +1,6 @@
+import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, TabList, TabSlot, TabTrigger } from "expo-router/ui";
-import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -18,47 +18,33 @@ type TabButtonProps = {
 
 function TabButton({ icon, iconActive, label, isFocused, onPress, ref }: TabButtonProps) {
   return (
-    <Pressable
-      ref={ref}
-      onPress={onPress}
-      style={[styles.tabItem, isFocused && styles.tabItemActive]}
-      hitSlop={4}
-    >
+    <Pressable ref={ref} onPress={onPress} style={styles.tabItem} hitSlop={4}>
       <Ionicons
         name={isFocused ? iconActive : icon}
-        size={22}
-        color={isFocused ? "#FFFFFF" : GRAY}
+        size={24}
+        color={isFocused ? GREEN : GRAY}
       />
       <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>{label}</Text>
     </Pressable>
   );
 }
 
+/**
+ * Apple-style floating tab bar: translucent frosted pill (real blur on iOS,
+ * translucent-white fallback on Android) with Home / Map only.
+ */
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
 
   return (
     <Tabs>
       <TabSlot />
 
-      {/* Floating pill tab bar */}
-      <TabList
-        style={[styles.pill, { bottom: Math.max(insets.bottom, 10) + 8 }]}
-      >
+      <TabList style={[styles.pill, { bottom: Math.max(insets.bottom, 10) + 8 }]}>
+        <BlurView intensity={50} tint="light" style={StyleSheet.absoluteFill} />
         <TabTrigger name="home" href="/home" asChild>
           <TabButton icon="home-outline" iconActive="home" label="Home" />
         </TabTrigger>
-
-        {/* Raised center action button */}
-        <Pressable
-          style={styles.fab}
-          onPress={() => router.push("/log/activity")}
-          hitSlop={8}
-        >
-          <Ionicons name="add" size={30} color="#FFFFFF" />
-        </Pressable>
-
         <TabTrigger name="map" href="/map" asChild>
           <TabButton icon="map-outline" iconActive="map" label="Map" />
         </TabTrigger>
@@ -70,22 +56,25 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   pill: {
     position: "absolute",
-    left: 20,
-    right: 20,
+    left: 24,
+    right: 24,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
+    // Translucent base so it reads as frosted glass on BOTH platforms
+    // (iOS layers the real BlurView vibrancy on top of it)
+    backgroundColor: "rgba(255,255,255,0.72)",
     borderRadius: 28,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ECECEC",
+    borderColor: "rgba(0,0,0,0.08)",
+    overflow: "hidden",
     // iOS shadow
     shadowColor: "#000000",
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
     // Android shadow
     elevation: 10,
   },
@@ -93,35 +82,16 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 2,
-  },
-  tabItemActive: {
-    backgroundColor: GREEN,
+    paddingVertical: 6,
+    gap: 3,
   },
   tabLabel: {
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: "500",
     color: GRAY,
   },
   tabLabelActive: {
-    color: "#FFFFFF",
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: GREEN,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: -26,
-    borderWidth: 4,
-    borderColor: "#FFFFFF",
-    shadowColor: GREEN,
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 12,
+    color: GREEN,
+    fontWeight: "700",
   },
 });

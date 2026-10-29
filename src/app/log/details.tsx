@@ -107,8 +107,6 @@ const [note, setNote] = useState(startNote ?? "");
         <View style={styles.emissionBox}>
           <Text style={styles.emissionLabel}>Estimated Emission</Text>
           <Text style={styles.emissionValue}>{emission} kg CO2e</Text>
-          <Text style={styles.emissionMeta}>Factor: {activity.factor} kg CO2e/{activity.unit}</Text>
-          <Text style={styles.emissionMeta}>Source: DEFRA 2024</Text>
         </View>
 
         <Text style={styles.label}>Add a note (optional)</Text>

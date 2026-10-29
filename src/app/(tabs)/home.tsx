@@ -271,7 +271,7 @@ const onEdit=(item: RecentItem)=>{
     activeOpacity={0.7}
     onPress={() => onEdit(a)}       // your future edit handler
   >
-          <View key={a.id} style={styles.activityRow}>
+          <View key={a.id} style={styles.activityInner}>
             <View style={styles.emojiCircle}>
               <Text style={styles.emoji}>{a.emoji}</Text>
             </View>
@@ -383,10 +383,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
+    borderColor: "#EFEFEF",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  activityInner: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
   },
   emojiCircle: {
     width: 36,

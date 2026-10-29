@@ -127,8 +127,6 @@ export default function ReviewScreen() {
           <View style={styles.emissionBox}>
             <Text style={styles.emissionLabel}>ESTIMATED EMISSION</Text>
             <Text style={styles.emissionValue}>{emission} kg CO2e</Text>
-            <Text style={styles.emissionMeta}>Factor: {activity.factor} kg CO2e/{activity.unit}</Text>
-            <Text style={styles.emissionMeta}>Source: DEFRA 2024</Text>
           </View>
 
           {!!note && <Text style={styles.note}>Note: {note}</Text>}

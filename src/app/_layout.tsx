@@ -1,6 +1,7 @@
 import { OfflineBanner } from "@/components/offline-banner";
 import { setupAutoSync, syncQueueIfNeeded } from "@/services/offlineSync";
 import { DarkTheme, DefaultTheme, ThemeProvider, Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { useColorScheme } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -22,6 +23,10 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      {/* Dark status-bar icons/text over the app's white theme (system bars
+          are edge-to-edge/transparent on modern Android, so they pick up the
+          white background automatically) */}
+      <StatusBar style="dark" />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         <OfflineBanner />
         <Stack screenOptions={{ headerShown: false }}>
