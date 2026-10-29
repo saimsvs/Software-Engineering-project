@@ -39,24 +39,6 @@ export default function LoginScreen() {
       const data = await res.json();
 
       if (!res.ok) {
-        if (data.code === "EMAIL_NOT_VERIFIED") {
-          Alert.alert(
-            "Email Not Verified",
-            "Please verify your email before logging in.",
-            [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Verify Now",
-                onPress: () =>
-                  router.push({
-                    pathname: "/verify-code",
-                    params: { email: data.email || email },
-                  }),
-              },
-            ]
-          );
-          return;
-        }
         Alert.alert("Error", data.message || "Login failed");
         return;
       }

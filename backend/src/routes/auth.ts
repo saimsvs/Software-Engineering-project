@@ -216,14 +216,6 @@ router.post("/login", async (req, res) => {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
-  if (!user.emailVerified) {
-    return res.status(403).json({
-      code: "EMAIL_NOT_VERIFIED",
-      message: "Please verify your email before logging in.",
-      email: user.email,
-    });
-  }
-
   const token = jwt.sign({ userId: user.id }, env.jwtSecret, {
     expiresIn: env.jwtExpiresIn,
   });
