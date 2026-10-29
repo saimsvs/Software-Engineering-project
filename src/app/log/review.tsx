@@ -1,6 +1,7 @@
 import { StepIndicator } from "@/components/step-indicator";
 import { ACTIVITIES, calcEmission } from "@/data/activities";
 import { apiFetch } from "@/utils/api";
+import { enqueue } from "@/utils/offlineQueue";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -12,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { v4 as uuidv4 } from "uuid";
 
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
@@ -37,18 +39,21 @@ export default function ReviewScreen() {
   const onSave = async () => {
     if (saving) return;
     setSaving(true);
+
+    const payload = {
+      activityId: activity.id,
+      category: activity.category,
+      distance: parseFloat(distance ?? "0"),
+      unit,
+      note: note || undefined,
+    };
+
     try {
       const res = await apiFetch(
         editId ? `/api/auth/activity/${editId}` : "/api/auth/activity",
         {
           method: editId ? "PATCH" : "POST",
-          body: JSON.stringify({
-            activityId: activity.id,
-            category: activity.category,
-            distance: parseFloat(distance ?? "0"),
-            unit,
-            note: note || undefined,
-          }),
+          body: JSON.stringify(payload),
         }
       );
       const data = await res.json();
@@ -58,13 +63,36 @@ export default function ReviewScreen() {
       }
       Alert.alert(
         editId ? "Updated" : "Saved",
-        editId ? "Activity updated in your history." : "Activity saved to your history.",
-        [
-          { text: "OK", onPress: () => router.replace("/home") },
-        ]
+        editId
+          ? "Activity updated in your history."
+          : "Activity saved to your history.",
+        [{ text: "OK", onPress: () => router.replace("/home") }]
       );
     } catch {
-      Alert.alert("Error", "Cannot connect to server");
+      // Network error - save to offline queue
+      try {
+        await enqueue({
+          id: uuidv4(),
+          type: editId ? "update" : "create",
+          endpoint: editId ? `/api/auth/activity/${editId}` : "/api/auth/activity",
+          method: editId ? "PATCH" : "POST",
+          payload,
+          serverId: editId,
+          createdAt: Date.now(),
+          retryCount: 0,
+          status: "pending",
+        });
+
+        Alert.alert(
+          "Saved Offline",
+          editId
+            ? "Update saved locally. It will sync automatically when you're back online."
+            : "Activity saved locally. It will sync automatically when you're back online.",
+          [{ text: "OK", onPress: () => router.replace("/home") }]
+        );
+      } catch (queueError) {
+        Alert.alert("Error", "Failed to save activity offline");
+      }
     } finally {
       setSaving(false);
     }

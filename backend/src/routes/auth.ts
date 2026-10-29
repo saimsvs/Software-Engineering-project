@@ -5,6 +5,8 @@ import { z } from "zod";
 import { prisma } from "../config/db.js";
 import { env } from "../config/env.js";
 import { requireAuth } from "../middleware/auth.js";
+import { compareCodes, generateVerificationCode, hashCode } from "../utils/crypto.js";
+import { sendVerificationCode } from "../services/email.js";
 const router = Router();
 
 const registerSchema = z.object({
@@ -16,6 +18,15 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
+});
+
+const verifyCodeSchema = z.object({
+  email: z.string().email(),
+  code: z.string().length(6),
+});
+
+const resendCodeSchema = z.object({
+  email: z.string().email(),
 });
 
 // POST /api/auth/register
@@ -36,15 +47,154 @@ router.post("/register", async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({
-    data: { name, email, passwordHash },
+    data: { name, email, passwordHash, emailVerified: false },
     select: { id: true, name: true, email: true, createdAt: true },
   });
 
-  const token = jwt.sign({ userId: user.id }, env.jwtSecret, {
-    expiresIn: env.jwtExpiresIn,
+  // Delete any existing verification codes for this user
+  await prisma.emailVerificationCode.deleteMany({
+    where: { userId: user.id },
   });
 
-  res.status(201).json({ user, token });
+  // Generate and store verification code
+  const code = generateVerificationCode();
+  const codeHash = hashCode(code);
+  const expiresAt = new Date(
+    Date.now() + env.verificationCodeExpMin * 60 * 1000
+  );
+
+  await prisma.emailVerificationCode.create({
+    data: {
+      codeHash,
+      userId: user.id,
+      expiresAt,
+    },
+  });
+
+  try {
+    await sendVerificationCode({ to: user.email, name: user.name, code });
+  } catch (error) {
+    console.error("Error sending verification email:", error);
+    // Still return success even if email fails to send in dev
+  }
+
+  res.status(201).json({
+    message: "Verification code sent to your email",
+    email: user.email,
+  });
+});
+
+// POST /api/auth/verify-code
+router.post("/verify-code", async (req, res) => {
+  const parsed = verifyCodeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Invalid input" });
+  }
+
+  const { email, code } = parsed.data;
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    return res.status(400).json({ message: "Invalid verification code" });
+  }
+
+  if (user.emailVerified) {
+    return res.status(400).json({ message: "Email already verified" });
+  }
+
+  const verificationCode = await prisma.emailVerificationCode.findFirst({
+    where: { userId: user.id },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!verificationCode) {
+    return res.status(400).json({ message: "Invalid or expired verification code" });
+  }
+
+  if (verificationCode.expiresAt < new Date()) {
+    await prisma.emailVerificationCode.delete({
+      where: { id: verificationCode.id },
+    });
+    return res.status(400).json({ message: "Verification code has expired" });
+  }
+
+  if (verificationCode.attempts >= 5) {
+    await prisma.emailVerificationCode.deleteMany({
+      where: { userId: user.id },
+    });
+    return res.status(400).json({
+      message: "Too many failed attempts. Please request a new code",
+    });
+  }
+
+  const isValid = compareCodes(code, verificationCode.codeHash);
+  if (!isValid) {
+    await prisma.emailVerificationCode.update({
+      where: { id: verificationCode.id },
+      data: { attempts: verificationCode.attempts + 1 },
+    });
+    return res.status(400).json({ message: "Invalid verification code" });
+  }
+
+  // Mark email as verified and delete all verification codes
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { emailVerified: true },
+  });
+
+  await prisma.emailVerificationCode.deleteMany({
+    where: { userId: user.id },
+  });
+
+  res.json({ message: "Email verified successfully" });
+});
+
+// POST /api/auth/resend-code
+router.post("/resend-code", async (req, res) => {
+  const parsed = resendCodeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Invalid input" });
+  }
+
+  const { email } = parsed.data;
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    // Don't reveal if user exists
+    return res.json({ message: "If an account exists, a verification code has been sent" });
+  }
+
+  if (user.emailVerified) {
+    return res.json({ message: "Email is already verified" });
+  }
+
+  // Delete any existing verification codes for this user
+  await prisma.emailVerificationCode.deleteMany({
+    where: { userId: user.id },
+  });
+
+  // Generate and store verification code
+  const code = generateVerificationCode();
+  const codeHash = hashCode(code);
+  const expiresAt = new Date(
+    Date.now() + env.verificationCodeExpMin * 60 * 1000
+  );
+
+  await prisma.emailVerificationCode.create({
+    data: {
+      codeHash,
+      userId: user.id,
+      expiresAt,
+    },
+  });
+
+  try {
+    await sendVerificationCode({ to: user.email, name: user.name, code });
+  } catch (error) {
+    console.error("Error sending verification email:", error);
+  }
+
+  res.json({ message: "If an account exists, a verification code has been sent" });
 });
 
 // POST /api/auth/login
@@ -66,6 +216,14 @@ router.post("/login", async (req, res) => {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
+  if (!user.emailVerified) {
+    return res.status(403).json({
+      code: "EMAIL_NOT_VERIFIED",
+      message: "Please verify your email before logging in.",
+      email: user.email,
+    });
+  }
+
   const token = jwt.sign({ userId: user.id }, env.jwtSecret, {
     expiresIn: env.jwtExpiresIn,
   });
@@ -79,7 +237,7 @@ router.post("/login", async (req, res) => {
 router.get("/me", requireAuth, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.userId },
-    select: { id: true, name: true, email: true, createdAt: true },
+    select: { id: true, name: true, email: true, emailVerified: true, createdAt: true },
   });
   if (!user) return res.status(404).json({ message: "User not found" });
   res.json({ user });
