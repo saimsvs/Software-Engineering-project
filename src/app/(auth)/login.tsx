@@ -5,6 +5,9 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -69,8 +72,13 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+      >
+      <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}>
         <Text style={styles.backArrow}>←</Text>
       </TouchableOpacity>
 
@@ -131,7 +139,8 @@ export default function LoginScreen() {
           <Text style={styles.registerLink}>Register</Text>
         </Text>
       </TouchableOpacity>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -140,6 +149,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 20,
+  },
+  scroll: {
+    flexGrow: 1,
   },
   backArrow: {
     fontSize: 28,

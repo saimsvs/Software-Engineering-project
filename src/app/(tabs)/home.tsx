@@ -298,7 +298,7 @@ const onEdit=(item: RecentItem)=>{
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#FFF" },
-  content: { paddingHorizontal: 20, paddingBottom: 32 },
+  content: { paddingHorizontal: 20, paddingBottom: 110 },
 
   greetingRow: {
     flexDirection: "row",

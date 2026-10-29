@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ScreenHeader } from "@/components/screen-header";
 import { v4 as uuidv4 } from "uuid";
 
 const GREEN = "#2E7D32";
@@ -100,13 +101,7 @@ export default function ReviewScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backArrow}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Review & Confirm</Text>
-        <View style={styles.backBtn} />
-      </View>
+      <ScreenHeader title="Review & Confirm" />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <StepIndicator current={3} label="Confirm" />
