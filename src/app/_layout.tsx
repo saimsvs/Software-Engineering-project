@@ -1,13 +1,19 @@
 import { OfflineBanner } from "@/components/offline-banner";
 import { setupAutoSync, syncQueueIfNeeded } from "@/services/offlineSync";
-import { DarkTheme, DefaultTheme, ThemeProvider, Stack } from "expo-router";
+import { DefaultTheme, ThemeProvider, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { useColorScheme } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// The app is light-only (userInterfaceStyle: "light" in app.json) — every
+// screen hardcodes the white theme, so always use the light navigation theme
+// regardless of the OS dark-mode setting.
+const LIGHT_THEME = {
+  ...DefaultTheme,
+  colors: { ...DefaultTheme.colors, background: "#FFFFFF" },
+};
+
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
 
   useEffect(() => {
     // Setup auto-sync on network reconnect
@@ -22,12 +28,12 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={LIGHT_THEME}>
       {/* Dark status-bar icons/text over the app's white theme (system bars
           are edge-to-edge/transparent on modern Android, so they pick up the
           white background automatically) */}
       <StatusBar style="dark" />
-      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }} edges={["top"]}>
         <OfflineBanner />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
