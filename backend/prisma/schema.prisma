@@ -8,14 +8,14 @@ datasource db {
 }
 
 model User {
-  id              String                @id @default(cuid())
-  name            String
-  email           String                @unique
-  passwordHash    String
-  emailVerified   Boolean               @default(false)
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
-  activityLogs    ActivityLog[]
+  id                String                  @id @default(cuid())
+  name              String
+  email             String                  @unique
+  passwordHash      String
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  emailVerified     Boolean                 @default(false)
+  activityLogs      ActivityLog[]
   verificationCodes EmailVerificationCode[]
 }
 
@@ -23,10 +23,10 @@ model EmailVerificationCode {
   id        String   @id @default(cuid())
   codeHash  String
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   attempts  Int      @default(0)
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -34,7 +34,6 @@ model EmailVerificationCode {
 model ActivityLog {
   id         String   @id @default(cuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   activityId String
   category   String
   distance   Float
@@ -42,6 +41,13 @@ model ActivityLog {
   emission   Float
   note       String?
   createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model Challenger {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
 }
