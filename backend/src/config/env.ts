@@ -8,8 +8,9 @@ export const env = {
   jwtExpiresIn: (process.env.JWT_EXPIRES_IN || "7d") as SignOptions["expiresIn"],
   databaseUrl: process.env.DATABASE_URL || "",
   appName: process.env.APP_NAME || "Carbon Footprint",
-  emailFrom: process.env.EMAIL_FROM || "onboarding@resend.dev",
-  resendApiKey: process.env.RESEND_API_KEY || "",
+  emailFrom: process.env.EMAIL_FROM || "",
+  gmailUser: process.env.GMAIL_USER || "",
+  gmailAppPassword: process.env.GMAIL_APP_PASSWORD || "",
   verificationCodeExpMin: parseInt(
     process.env.VERIFICATION_CODE_EXP_MIN || "10",
     10

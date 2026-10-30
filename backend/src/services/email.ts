@@ -1,10 +1,16 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { env } from "../config/env.js";
 
-let resend: Resend | null = null;
+let transporter: nodemailer.Transporter | null = null;
 
-if (env.resendApiKey) {
-  resend = new Resend(env.resendApiKey);
+if (env.gmailUser && env.gmailAppPassword) {
+  transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: env.gmailUser,
+      pass: env.gmailAppPassword,
+    },
+  });
 }
 
 export async function sendVerificationCode({
@@ -16,10 +22,10 @@ export async function sendVerificationCode({
   name: string;
   code: string;
 }): Promise<void> {
-  if (resend) {
+  if (transporter && env.gmailUser) {
     try {
-      await resend.emails.send({
-        from: env.emailFrom,
+      await transporter.sendMail({
+        from: `"${env.appName}" <${env.gmailUser}>`,
         to,
         subject: `${env.appName} - Verify your email`,
         html: `
@@ -38,14 +44,14 @@ export async function sendVerificationCode({
       });
       return;
     } catch (error) {
-      console.error("Failed to send email via Resend:", error);
+      console.error("Failed to send email via Gmail SMTP:", error);
       throw error;
     }
   }
 
-  // Fallback for development when no API key is configured
+  // Fallback for development when Gmail SMTP is not configured
   console.log("\n========================================");
-  console.log("VERIFICATION EMAIL (DEV MODE - Resend not configured)");
+  console.log("VERIFICATION EMAIL (DEV MODE - Gmail SMTP not configured)");
   console.log("========================================");
   console.log(`To: ${to}`);
   console.log(`Name: ${name}`);
