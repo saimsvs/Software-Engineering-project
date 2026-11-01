@@ -18,10 +18,10 @@ export default function RootLayout() {
   useEffect(() => {
     // Setup auto-sync on network reconnect
     const unsubscribe = setupAutoSync();
-    
+
     // Try to sync on app start
     syncQueueIfNeeded();
-    
+
     return () => {
       unsubscribe();
     };
@@ -39,6 +39,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="organizer" />
           <Stack.Screen name="log/activity" />
           <Stack.Screen name="log/details" />
           <Stack.Screen name="log/review" />
