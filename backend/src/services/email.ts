@@ -54,6 +54,48 @@ async function sendViaSmtp(options: nodemailer.SendMailOptions): Promise<void> {
   throw lastError;
 }
 
+// EMAIL_FROM may be "Name <user@example.com>" — APIs want the bare address.
+function senderEmail(): string {
+  const raw = env.emailFrom || env.gmailUser;
+  const match = raw.match(/<([^>]+)>/);
+  return (match ? match[1] : raw).trim();
+}
+
+// Brevo's HTTP API works over port 443, which hosting platforms never block.
+// Free tier: 300 emails/day; the sender address only needs email verification
+// (no domain purchase required).
+async function sendViaBrevo(options: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    throw new Error("BREVO_API_KEY is not configured");
+  }
+
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": apiKey,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      sender: { name: env.appName, email: senderEmail() },
+      to: [{ email: options.to }],
+      subject: options.subject,
+      htmlContent: options.html,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Brevo API returned ${response.status}: ${await response.text()}`
+    );
+  }
+}
+
 async function sendViaResend(options: {
   to: string;
   subject: string;
@@ -64,7 +106,6 @@ async function sendViaResend(options: {
     throw new Error("RESEND_API_KEY is not configured");
   }
 
-  // HTTPS (443) is never blocked by host firewalls, unlike SMTP ports.
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -110,8 +151,27 @@ export async function sendVerificationCode({
     </div>
   `;
 
+  // HTTPS providers come first: some hosts (including Render) block outbound
+  // SMTP ports, so trying SMTP first would just add 30s of dead timeouts.
+  if (process.env.BREVO_API_KEY) {
+    try {
+      await sendViaBrevo({ to, subject, html });
+      return;
+    } catch (error) {
+      console.error("Failed to send email via Brevo:", error);
+    }
+  }
+
+  if (process.env.RESEND_API_KEY) {
+    try {
+      await sendViaResend({ to, subject, html });
+      return;
+    } catch (error) {
+      console.error("Failed to send email via Resend:", error);
+    }
+  }
+
   const smtpConfigured = Boolean(env.gmailUser && env.gmailAppPassword);
-  const resendConfigured = Boolean(process.env.RESEND_API_KEY);
 
   if (smtpConfigured) {
     try {
@@ -127,19 +187,7 @@ export async function sendVerificationCode({
     }
   }
 
-  // Fallback: if the host blocks outbound SMTP ports entirely, deliver over
-  // HTTPS through Resend when an API key is available.
-  if (resendConfigured) {
-    try {
-      await sendViaResend({ to, subject, html });
-      console.log(`Verification email for ${to} sent via Resend HTTPS API`);
-      return;
-    } catch (error) {
-      console.error("Failed to send email via Resend:", error);
-    }
-  }
-
-  if (smtpConfigured || resendConfigured) {
+  if (process.env.BREVO_API_KEY || process.env.RESEND_API_KEY || smtpConfigured) {
     throw new Error("All configured email providers failed — see logs above");
   }
 
