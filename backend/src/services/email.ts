@@ -1,21 +1,89 @@
+import { setDefaultResultOrder } from "node:dns";
 import nodemailer from "nodemailer";
 import { env } from "../config/env.js";
 
-let transporter: nodemailer.Transporter | null = null;
+// Prefer IPv4 for outbound connections. Some hosting networks have broken
+// IPv6 egress; smtp.gmail.com is dual-stack (A + AAAA), so an unreachable
+// IPv6 route makes the TCP connect stall until connectionTimeout fires.
+setDefaultResultOrder("ipv4first");
 
-if (env.gmailUser && env.gmailAppPassword) {
-  transporter = nodemailer.createTransport({
-    service: "gmail",
+const SMTP_HOST = "smtp.gmail.com";
+
+// Port 587 (STARTTLS) is the standard mail submission port. Port 465
+// (implicit TLS) is kept as a fallback because some networks block one of
+// the two. Every attempt fails fast thanks to the timeouts below.
+const SMTP_PORTS: Array<{ port: number; secure: boolean }> = [
+  { port: 587, secure: false },
+  { port: 465, secure: true },
+];
+
+function createTransport(port: number, secure: boolean): nodemailer.Transporter {
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port,
+    secure,
+    requireTLS: !secure,
     auth: {
       user: env.gmailUser,
       pass: env.gmailAppPassword,
     },
     // Fail fast instead of hanging requests for minutes when the SMTP
-    // connection stalls (connection/greeting 15s, then 60s of inactivity)
+    // connection stalls (connect/greeting 15s, then 60s of inactivity).
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 60000,
   });
+}
+
+async function sendViaSmtp(options: nodemailer.SendMailOptions): Promise<void> {
+  let lastError: unknown;
+
+  for (const { port, secure } of SMTP_PORTS) {
+    const transport = createTransport(port, secure);
+    try {
+      await transport.sendMail(options);
+      return;
+    } catch (error) {
+      lastError = error;
+      console.error(`Failed to send email via Gmail SMTP on port ${port}:`, error);
+    } finally {
+      transport.close();
+    }
+  }
+
+  throw lastError;
+}
+
+async function sendViaResend(options: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured");
+  }
+
+  // HTTPS (443) is never blocked by host firewalls, unlike SMTP ports.
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: env.emailFrom || `${env.appName} <onboarding@resend.dev>`,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Resend API returned ${response.status}: ${await response.text()}`
+    );
+  }
 }
 
 export async function sendVerificationCode({
@@ -27,36 +95,57 @@ export async function sendVerificationCode({
   name: string;
   code: string;
 }): Promise<void> {
-  if (transporter && env.gmailUser) {
+  const subject = `${env.appName} - Verify your email`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2>Welcome to ${env.appName}!</h2>
+      <p>Hi ${name},</p>
+      <p>Thank you for signing up. Please use the verification code below to verify your email address:</p>
+      <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 30px 0;">
+        ${code}
+      </div>
+      <p>This code will expire in ${env.verificationCodeExpMin} minutes.</p>
+      <p>If you didn't create an account, you can safely ignore this email.</p>
+      <p>Best regards,<br/>The ${env.appName} Team</p>
+    </div>
+  `;
+
+  const smtpConfigured = Boolean(env.gmailUser && env.gmailAppPassword);
+  const resendConfigured = Boolean(process.env.RESEND_API_KEY);
+
+  if (smtpConfigured) {
     try {
-      await transporter.sendMail({
+      await sendViaSmtp({
         from: `"${env.appName}" <${env.gmailUser}>`,
         to,
-        subject: `${env.appName} - Verify your email`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>Welcome to ${env.appName}!</h2>
-            <p>Hi ${name},</p>
-            <p>Thank you for signing up. Please use the verification code below to verify your email address:</p>
-            <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 30px 0;">
-              ${code}
-            </div>
-            <p>This code will expire in ${env.verificationCodeExpMin} minutes.</p>
-            <p>If you didn't create an account, you can safely ignore this email.</p>
-            <p>Best regards,<br/>The ${env.appName} Team</p>
-          </div>
-        `,
+        subject,
+        html,
       });
       return;
     } catch (error) {
-      console.error("Failed to send email via Gmail SMTP:", error);
-      throw error;
+      console.error("Failed to send email via Gmail SMTP (all ports):", error);
     }
   }
 
-  // Fallback for development when Gmail SMTP is not configured
+  // Fallback: if the host blocks outbound SMTP ports entirely, deliver over
+  // HTTPS through Resend when an API key is available.
+  if (resendConfigured) {
+    try {
+      await sendViaResend({ to, subject, html });
+      console.log(`Verification email for ${to} sent via Resend HTTPS API`);
+      return;
+    } catch (error) {
+      console.error("Failed to send email via Resend:", error);
+    }
+  }
+
+  if (smtpConfigured || resendConfigured) {
+    throw new Error("All configured email providers failed — see logs above");
+  }
+
+  // Fallback for development when no email provider is configured
   console.log("\n========================================");
-  console.log("VERIFICATION EMAIL (DEV MODE - Gmail SMTP not configured)");
+  console.log("VERIFICATION EMAIL (DEV MODE - no email provider configured)");
   console.log("========================================");
   console.log(`To: ${to}`);
   console.log(`Name: ${name}`);

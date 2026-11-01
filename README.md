@@ -12,6 +12,7 @@ The API server lives in `backend/` and is deployed on **Render** (deploys from `
 | `GMAIL_USER` | ✅ (for real emails) | Gmail address that sends verification codes |
 | `GMAIL_APP_PASSWORD` | ✅ (for real emails) | 16-char Gmail app password (NOT the account password) |
 | `EMAIL_FROM` | optional | "From" name/address in outgoing mail |
+| `RESEND_API_KEY` | optional | HTTPS fallback for email if the host blocks outbound SMTP ports |
 | `APP_NAME` | optional | Display name in emails, default `Carbon Footprint` |
 | `VERIFICATION_CODE_EXP_MIN` | optional | Code expiry in minutes, default `10` |
 | `PORT` | set by Render | Server port |
