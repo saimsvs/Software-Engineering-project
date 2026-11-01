@@ -47,7 +47,9 @@ model ActivityLog {
 }
 
 model Organizer {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  createdAt DateTime @default(now())
+  email        String   @unique
+  createdAt    DateTime @default(now())
+  name         String
+  passwordHash String
+  organizerId  String   @id @unique @default(cuid())
 }
