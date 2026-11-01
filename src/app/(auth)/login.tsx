@@ -59,8 +59,12 @@ export default function LoginScreen() {
       }
 
       await saveToken(data.token);
-      Alert.alert("Success", "Logged in!");
-      router.replace("/home");
+      if (data.user?.role === "organizer") {
+        router.replace("/organizer");
+      } else {
+        Alert.alert("Success", "Logged in!");
+        router.replace("/home");
+      }
     } catch {
       Alert.alert("Error", "Cannot connect to server");
     } finally {

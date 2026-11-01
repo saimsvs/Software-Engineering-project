@@ -206,6 +206,33 @@ router.post("/login", async (req, res) => {
 
   const { email, password } = parsed.data;
 
+  // Check if it's an organizer first
+  const organizer = await prisma.organizer.findUnique({ where: { email } });
+  if (organizer) {
+    const valid = await bcrypt.compare(password, organizer.passwordHash);
+    if (!valid) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { userId: organizer.organizerId, role: "organizer" },
+      env.jwtSecret,
+      {
+        expiresIn: env.jwtExpiresIn,
+      }
+    );
+
+    return res.json({
+      user: {
+        id: organizer.organizerId,
+        name: organizer.name,
+        email: organizer.email,
+        role: "organizer",
+      },
+      token,
+    });
+  }
+
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     return res.status(401).json({ message: "Invalid credentials" });
@@ -224,12 +251,12 @@ router.post("/login", async (req, res) => {
     });
   }
 
-  const token = jwt.sign({ userId: user.id }, env.jwtSecret, {
+  const token = jwt.sign({ userId: user.id, role: "user" }, env.jwtSecret, {
     expiresIn: env.jwtExpiresIn,
   });
 
   res.json({
-    user: { id: user.id, name: user.name, email: user.email },
+    user: { id: user.id, name: user.name, email: user.email, role: "user" },
     token,
   });
 });
