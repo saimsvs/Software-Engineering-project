@@ -1,5 +1,33 @@
 trello - https://trello.com/b/FjpMu5UH/software-engineering-project
 
+## ⚙️ Backend Setup & Environment Variables
+
+The API server lives in `backend/` and is deployed on **Render** (deploys from `main`). It expects the following environment variables — see `backend/.env.example` for a copyable template:
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `DATABASE_URL` | ✅ | PostgreSQL connection string (Render external database URL) |
+| `JWT_SECRET` | ✅ | Signs login tokens — use a long random string |
+| `JWT_EXPIRES_IN` | optional | Token lifetime, default `7d` |
+| `GMAIL_USER` | ✅ (for real emails) | Gmail address that sends verification codes |
+| `GMAIL_APP_PASSWORD` | ✅ (for real emails) | 16-char Gmail app password (NOT the account password) |
+| `EMAIL_FROM` | optional | "From" name/address in outgoing mail |
+| `APP_NAME` | optional | Display name in emails, default `Carbon Footprint` |
+| `VERIFICATION_CODE_EXP_MIN` | optional | Code expiry in minutes, default `10` |
+| `PORT` | set by Render | Server port |
+
+### Email verification (Gmail SMTP)
+
+Verification emails are sent through Gmail SMTP using [nodemailer](https://nodemailer.com/). To set up the app password:
+
+1. Enable **2-Step Verification** on the sending Google account (Google Account → Security)
+2. Search **"App passwords"** in the same Security page and generate one
+3. Put the Gmail address and the 16-char app password in Render → Environment (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) — or in `backend/.env` locally
+
+If these variables are missing, the server does not crash: it falls back to printing verification codes to the logs (`VERIFICATION EMAIL (DEV MODE ...)` banner) so registration still works during development.
+
+> Local development: copy `backend/.env.example` to `backend/.env` and fill in real values. The `.env` file is gitignored — never commit credentials.
+
 ## 🌱 Emission Factors & Data Sources
 
 All CO₂e calculations in CarbonTrail are based on the **UK Government DEFRA (Department for Energy Security & Net Zero) GHG Conversion Factors for 2024**:
