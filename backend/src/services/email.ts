@@ -10,6 +10,11 @@ if (env.gmailUser && env.gmailAppPassword) {
       user: env.gmailUser,
       pass: env.gmailAppPassword,
     },
+    // Fail fast instead of hanging requests for minutes when the SMTP
+    // connection stalls (connection/greeting 15s, then 60s of inactivity)
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 60000,
   });
 }
 
