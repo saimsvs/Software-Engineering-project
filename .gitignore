@@ -45,3 +45,4 @@ example
 # prisma generated client
 backend/generated/
 backend/.agents/
+/carbon_footprint/

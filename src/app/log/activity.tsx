@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ScreenHeader } from "@/components/screen-header";
 
 
 const GREEN = "#2E7D32";
@@ -45,13 +46,7 @@ const [selected, setSelected] = useState<string | null>(incoming?.id ?? null);
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backArrow}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Log Activity</Text>
-        <View style={styles.backBtn} />
-      </View>
+      <ScreenHeader title="Log Activity" />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <StepIndicator current={1} label="Choose Activity" />

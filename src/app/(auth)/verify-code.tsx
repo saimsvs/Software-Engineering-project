@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -124,8 +126,8 @@ export default function VerifyCodeScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/login"))}>
         <Text style={styles.backArrow}>←</Text>
       </TouchableOpacity>
 
@@ -193,7 +195,7 @@ export default function VerifyCodeScreen() {
           Back to <Text style={styles.loginLink}>Login</Text>
         </Text>
       </TouchableOpacity>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
