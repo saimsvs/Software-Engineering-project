@@ -6,7 +6,7 @@
 - Verify core user flows work as expected: registration, email verification, login, activity logging, and organizer login.
 - Validate data integrity (correct emission calculations, correct user ownership of activities).
 - Confirm offline caching queues activities and syncs when connectivity is restored.
-- Ensure security boundaries: protected routes require auth, users can only access/modify their own data, unverified users cannot log in.
+- Ensure security boundaries: protected routes require auth, users can only access/modify their own data, verification codes are never stored in plaintext.
 - Identify defects early and provide a repeatable baseline for regression testing.
 
 ### 1.2 Scope
@@ -26,15 +26,15 @@
 - Cross-platform exhaustive testing (focus on primary target: Android emulator/device; iOS/web as smoke if available).
 - Map tab functionality (placeholder).
 - Future organizer features (dashboard is blank by design).
-- Automated CI pipeline setup (test cases can be automated later).
+- CI pipeline wiring (the automated suite runs locally with `npm test`; hooking it to GitHub Actions is a later step).
 
 ### 1.3 Test Strategy
 | Level | Approach | Tools/Method |
 |---|---|---|
-| **Unit (backend)** | Validate utilities (code generation/hashing, emission factors if extracted), schema/validation logic. | Jest/Vitest + Prisma test patterns (future) / manual for now |
-| **API / Integration** | Test auth + activity endpoints end-to-end against a test DB. | Postman/Thunder Client, curl/Invoke-RestMethod, or automated API tests |
+| **Unit (backend)** | Validate utilities (code generation/hashing) and server-side emission math. | **Automated:** Vitest (`backend/tests/crypto.test.ts`) |
+| **API / Integration** | Test auth, organizer and activity endpoints end-to-end, with Prisma and the email provider replaced by in-memory fakes. | **Automated:** Vitest + Supertest (`backend/tests/*.test.ts`) |
 | **UI / E2E (frontend)** | Validate screen flows, form validation, navigation, offline banner, sync behavior. | Manual on Android emulator + Expo Go/dev build; Detox/Maestro later |
-| **Manual exploratory** | Edge cases, error states, network transitions. | Tester-driven sessions |
+| **Manual exploratory** | Edge cases, error states, network transitions, real email delivery. | Tester-driven sessions |
 
 **Test data**
 - Use dedicated test emails (including the organizer emails added to DB: `umama.m.mianoor@gmail.com`, `Saim.29hs@gmail.com`, `kashifjaffari1@gmail.com`).
@@ -49,6 +49,36 @@
   - Backend: `cd backend && node node_modules/tsx/dist/cli.mjs src/index.ts` (or `npm run dev`)
   - Frontend: `cd <root> && node node_modules/expo/bin/cli start` (ensure deps installed)
   - Android emulator: ensure ADB reverse if using local backend (`adb reverse tcp:3000 tcp:3000`)
+
+#### 1.4.1 Automated test suite (implemented)
+
+Run from the repo root:
+
+```bash
+npm test              # one-shot run (API + unit tests)
+npm run test:watch    # re-run affected tests while editing
+```
+
+or from `backend/`:
+
+```bash
+npm test              # vitest run
+npm run test:watch    # vitest
+```
+
+Notes:
+- **No database, SMTP account or running server is required.** `backend/tests/setup.ts` swaps the Prisma client for an in-memory fake (`backend/tests/helpers/fakePrisma.ts`) and stubs `sendVerificationCode`, so the suite is hermetic and safe to run anywhere.
+- The Express app is exercised through **Supertest**, so real routing, middleware, validation (Zod), JWT signing and emission calculation are all under test.
+- Because the fake stores data in memory, tests also assert persisted state directly (e.g. code hashes, `emailVerified`, activity ownership).
+- JWT signing uses a fixed `test-secret`; `.env` values for the database/SMTP are never reached.
+- Not covered automatically (kept manual below): real email delivery, offline queue/sync behaviour on a device, and all UI navigation.
+
+| Test file | Covers |
+|---|---|
+| `backend/tests/crypto.test.ts` | Code generation, SHA-256 hashing, timing-safe comparison |
+| `backend/tests/auth.test.ts` | Registration, verification, resend, login, `/me`, organizer login |
+| `backend/tests/activity.test.ts` | Activity create/list/update/delete, emission math, ownership, auth |
+| `backend/tests/health.test.ts` | Health endpoint smoke test |
 
 ### 1.5 Entry / Exit Criteria
 **Entry**
@@ -98,7 +128,7 @@
 | ID | Title | Priority | Preconditions | Steps | Expected Result |
 |---|---|---:|---|---|---|
 | AUTH-LOG-001 | Login verified user | P0 | Verified user exists | Enter correct email/password. | 200 with token + user (`role: "user"`); token saved; navigates to `/home`. |
-| AUTH-LOG-002 | Login unverified user blocked | P0 | Registered but not verified | Enter correct credentials. | 403 `EMAIL_NOT_VERIFIED`; UI prompts to verify/resend; no token saved; no access to home. |
+| AUTH-LOG-002 | Login with an unverified account (current behaviour) | P1 | Registered but not verified | Enter correct credentials. | **Behaviour changed in `a912ee3`:** login succeeds (200 + token, `role: "user"`) because verification is enforced only in the register→verify flow. Revisit if login is meant to block unverified users. |
 | AUTH-LOG-003 | Login wrong password | P1 | User exists | Enter wrong password. | 401 “Invalid credentials”; no token. |
 | AUTH-LOG-004 | Login unknown email | P1 | Email not in User/Organizer | Submit login. | 401 “Invalid credentials” (no enumeration). |
 | AUTH-LOG-005 | `/me` returns user profile | P1 | Valid token | Call `GET /api/auth/me` with Bearer token. | Returns user fields including `emailVerified`; 401/404 appropriately when unauthenticated/missing. |
@@ -150,15 +180,28 @@
 | SEC-003 | Input validation on auth endpoints | P1 | — | Send malformed JSON/missing fields. | 400 responses; server remains stable. |
 | SEC-004 | CORS/health endpoint | P3 | Backend running | `GET /api/health`. | Returns `{ status: "ok", ... }`. |
 
+### 2.7 Automation Coverage Map
+
+Legend: **A** = automated (`npm test`), **M** = manual (device/emulator or real email).
+
+| Automated (A) | Manual (M) |
+|---|---|
+| AUTH-REG-001…004 | AUTH-VER-007 (real email delivery via Gmail SMTP) |
+| AUTH-VER-001…006, 008…010 | ORG-002, ORG-003 (organizer screen + logout UI) |
+| AUTH-LOG-001…007 | ACT UI flow inside the app (the API is automated) |
+| ORG-001, ORG-004, ORG-005 | OFF-001…008 (offline queue + sync on device) |
+| ACT-001…007 | SEC-001–004 spot-check against the deployed API |
+| SEC-002 (hash-at-rest), SEC-004 | Exploratory / usability sessions |
+
+Automated test names mirror the case IDs (`AUTH-REG-001`, `ACT-005`, …) so a failing run maps straight back to this document.
+
 ---
 
 ## 3. Suggested Execution Order (Initial Run)
-1. **Environment sanity**: SEC-004, migrations applied, Gmail SMTP config verified.
-2. **P0 auth**: AUTH-REG-001, AUTH-VER-001, AUTH-LOG-001, AUTH-LOG-002.
-3. **P0 organizer**: ORG-001, ORG-003.
-4. **P0 activities**: ACT-001, ACT-005, ACT-007.
-5. **P0 offline**: OFF-001, OFF-003.
-6. Remaining P1/P2 cases and exploratory testing.
+1. **Run the automated suite**: `npm test` (covers the API/unit cases listed as **A** above).
+2. **Environment sanity**: migrations applied, Gmail SMTP config verified.
+3. **Manual P0**: AUTH-VER-007, ORG-002, ORG-003, OFF-001, OFF-003.
+4. Remaining P1/P2 manual cases and exploratory testing.
 
 ## 4. Open Items / Dependencies
 - Set known passwords (bcrypt hashes) for the 3 organizer emails in the `Organizer` table.
