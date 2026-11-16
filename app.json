@@ -28,6 +28,15 @@
     },
     "plugins": [
       "expo-router",
+      "expo-system-ui",
+      [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": false,
+          "hidden": false,
+          "style": "dark"
+        }
+      ],
       [
         "expo-splash-screen",
         {

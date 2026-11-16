@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "@/components/screen-header";
-import { v4 as uuidv4 } from "uuid";
+import { newId } from "@/utils/id";
 
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
@@ -49,31 +49,12 @@ export default function ReviewScreen() {
       note: note || undefined,
     };
 
-    try {
-      const res = await apiFetch(
-        editId ? `/api/auth/activity/${editId}` : "/api/auth/activity",
-        {
-          method: editId ? "PATCH" : "POST",
-          body: JSON.stringify(payload),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        Alert.alert("Error", data.message || "Could not save activity");
-        return;
-      }
-      Alert.alert(
-        editId ? "Updated" : "Saved",
-        editId
-          ? "Activity updated in your history."
-          : "Activity saved to your history.",
-        [{ text: "OK", onPress: () => router.replace("/home") }]
-      );
-    } catch {
-      // Network error - save to offline queue
+    // Store the entry on this phone first, then let the sync service upload it
+    // whenever a connection is available.
+    const queueLocally = async (message: string) => {
       try {
         await enqueue({
-          id: uuidv4(),
+          id: newId(),
           type: editId ? "update" : "create",
           endpoint: editId ? `/api/auth/activity/${editId}` : "/api/auth/activity",
           method: editId ? "PATCH" : "POST",
@@ -84,16 +65,55 @@ export default function ReviewScreen() {
           status: "pending",
         });
 
+        Alert.alert("Saved offline", message, [
+          { text: "OK", onPress: () => router.replace("/home") },
+        ]);
+      } catch {
         Alert.alert(
-          "Saved Offline",
+          "Could not save",
+          "This activity could not be stored on your phone. Please try again."
+        );
+      }
+    };
+
+    try {
+      const res = await apiFetch(
+        editId ? `/api/auth/activity/${editId}` : "/api/auth/activity",
+        {
+          method: editId ? "PATCH" : "POST",
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (res.ok) {
+        Alert.alert(
+          editId ? "Updated" : "Saved",
           editId
-            ? "Update saved locally. It will sync automatically when you're back online."
-            : "Activity saved locally. It will sync automatically when you're back online.",
+            ? "Activity updated in your history."
+            : "Activity saved to your history.",
           [{ text: "OK", onPress: () => router.replace("/home") }]
         );
-      } catch (queueError) {
-        Alert.alert("Error", "Failed to save activity offline");
+        return;
       }
+
+      const data = await res.json().catch(() => ({}));
+
+      // Server is down (5xx) — keep the entry instead of throwing it away.
+      if (res.status >= 500) {
+        await queueLocally(
+          "The server is unavailable right now. Your activity is saved on this phone and will sync automatically."
+        );
+        return;
+      }
+
+      Alert.alert("Error", data.message || "Could not save activity");
+    } catch {
+      // Network error - save to offline queue
+      await queueLocally(
+        editId
+          ? "Update saved locally. It will sync automatically when you're back online."
+          : "Activity saved locally. It will sync automatically when you're back online."
+      );
     } finally {
       setSaving(false);
     }

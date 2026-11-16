@@ -1,3 +1,4 @@
+import { ScreenHeader } from "@/components/screen-header";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -8,10 +9,17 @@ const GRAY = "#666";
 export default function MapScreen() {
   return (
     <SafeAreaView style={styles.safe}>
+      <ScreenHeader
+        title="Carbon Map"
+        subtitle="Aggregated emissions by area"
+        showBack={false}
+      />
       <View style={styles.center}>
         <Text style={styles.emoji}>🗺️</Text>
-        <Text style={styles.title}>Carbon Map</Text>
-        <Text style={styles.subtitle}>Coming soon — aggregated emissions by area</Text>
+        <Text style={styles.title}>Coming soon</Text>
+        <Text style={styles.subtitle}>
+          See the carbon footprint of your neighbourhood on the map.
+        </Text>
       </View>
     </SafeAreaView>
   );
