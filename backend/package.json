@@ -8,7 +8,8 @@
     "start": "tsx src/index.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "render-build": "prisma generate --config prisma7.config.ts && prisma migrate deploy --config prisma7.config.ts"
   },
   "keywords": [],
   "author": "",

@@ -6,7 +6,7 @@ The API server lives in `backend/` and is deployed on **Render** (deploys from `
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `DATABASE_URL` | ✅ | PostgreSQL connection string (Render external database URL) |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string (Render Internal or External database URL — both work; SSL is used only for External) |
 | `JWT_SECRET` | ✅ | Signs login tokens — use a long random string |
 | `JWT_EXPIRES_IN` | optional | Token lifetime, default `7d` |
 | `GMAIL_USER` | optional | Gmail address that sends verification codes (SMTP) |
@@ -17,6 +17,22 @@ The API server lives in `backend/` and is deployed on **Render** (deploys from `
 | `APP_NAME` | optional | Display name in emails, default `Carbon Footprint` |
 | `VERIFICATION_CODE_EXP_MIN` | optional | Code expiry in minutes, default `10` |
 | `PORT` | set by Render | Server port |
+
+### 🔁 Moving to a new Render account
+
+Render's free web service and free Postgres both expire, so the backend gets moved to a new account from time to time. `render.yaml` (a Render Blueprint) creates **both** the web service and the database in one go.
+
+1. **Back up the old data** while the old database still works. In the old account, open the database → Connections → copy the **External Database URL**.
+2. **New account → New → Blueprint** → connect GitHub → choose this repo. Render reads `render.yaml` and shows `carbon-backend` (web) + `carbon-db` (Postgres), both on the Free plan.
+3. When it asks for secrets, enter `BREVO_API_KEY` and `EMAIL_FROM` (same values as the old account). `DATABASE_URL` is wired automatically and `JWT_SECRET` is generated (users just log in again once).
+4. Click **Apply**. The build runs `prisma generate` and `prisma migrate deploy`, so the tables are created automatically.
+5. **Copy the data over** (optional — skip it and everyone has to sign up again). Copy the new database's **External Database URL**, then run:
+   ```bash
+   ./scripts/move-render-db.sh "OLD_EXTERNAL_DB_URL" "NEW_EXTERNAL_DB_URL"
+   ```
+   It saves a backup `.sql` on your Desktop and restores it into the new database. If you run it after the backend has deployed, it replaces those freshly created tables, which is fine.
+6. **Point the app at the new backend**: put the new `https://….onrender.com` URL in `src/config/api.ts`, then rebuild the app.
+7. Check `https://<new-url>/api/health` responds, then delete the old services in the old account.
 
 ### Email verification
 

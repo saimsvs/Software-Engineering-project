@@ -1,0 +1,41 @@
+# Render Blueprint: creates the backend web service AND its Postgres database.
+# On a new Render account: New -> Blueprint -> pick this GitHub repo -> fill in the secrets.
+# See "Moving to a new Render account" in README.md.
+
+databases:
+  - name: carbon-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "18"
+
+services:
+  - type: web
+    name: carbon-backend
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm ci && npm run render-build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: carbon-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: APP_NAME
+        value: Carbon Footprint
+      - key: VERIFICATION_CODE_EXP_MIN
+        value: "10"
+      # Secrets: Render asks you to type these in when you create the Blueprint.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
