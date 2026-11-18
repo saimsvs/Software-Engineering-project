@@ -167,7 +167,7 @@ export default function StatsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFF" },
+  safe: { flex: 1, backgroundColor: "#F5F7F5" },
 
   header: {
     flexDirection: "row",

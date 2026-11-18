@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { UI, cardShadow } from "@/constants/ui";
 import { ScreenHeader } from "@/components/screen-header";
 
 const GREEN = "#2E7D32";
@@ -131,7 +132,7 @@ const [note, setNote] = useState(startNote ?? "");
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFF" },
+  safe: { flex: 1, backgroundColor: UI.bg },
 
   header: {
     flexDirection: "row",
@@ -154,12 +155,12 @@ const styles = StyleSheet.create({
   activityCard: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: GREEN,
-    borderRadius: 10,
+    backgroundColor: UI.card,
+    borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
     marginBottom: 24,
+    ...cardShadow,
   },
   activityIcon: { marginRight: 10 },
   activityName: { flex: 1, fontSize: 16, fontWeight: "600", color: DARK },
@@ -179,7 +180,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1.5,
     borderColor: GREEN,
-    borderRadius: 10,
+    borderRadius: 14,
     paddingHorizontal: 16,
     backgroundColor: "#FFF",
   },
@@ -214,7 +215,7 @@ const styles = StyleSheet.create({
 
   emissionBox: {
     backgroundColor: LIGHT_GREEN,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginTop: 20,
     marginBottom: 24,
@@ -226,7 +227,7 @@ const styles = StyleSheet.create({
   noteInput: {
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: 10,
+    borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
@@ -237,7 +238,7 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 4 },
   nextBtn: {
     backgroundColor: GREEN,
-    borderRadius: 10,
+    borderRadius: 14,
     height: 52,
     justifyContent: "center",
     alignItems: "center",

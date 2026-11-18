@@ -14,11 +14,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "@/components/screen-header";
 import type { IconName } from "@/data/activities";
 import { Ionicons } from "@expo/vector-icons";
+import { UI, cardShadow } from "@/constants/ui";
 
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
 const LIGHT_GREEN = "#E8F5E9";
-const BORDER = "#E0E0E0";
 const GRAY = "#666";
 const RED = "#D32F2F";
 
@@ -170,7 +170,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFF" },
+  safe: { flex: 1, backgroundColor: UI.bg },
 
   header: {
     flexDirection: "row",
@@ -206,44 +206,46 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#FFF",
-    borderWidth: 1,
-    borderColor: BORDER,
+    backgroundColor: UI.card,
     justifyContent: "center",
     alignItems: "center",
+    ...cardShadow,
   },
 
-  name: { fontSize: 22, fontWeight: "bold", color: DARK },
+  name: { fontSize: 24, fontWeight: "800", color: DARK, letterSpacing: -0.4 },
   username: { fontSize: 14, fontWeight: "600", color: GREEN, marginTop: 2 },
   email: { fontSize: 14, color: GRAY, marginTop: 2, marginBottom: 18 },
 
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 24, alignSelf: "stretch" },
   statBox: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 12,
-    paddingVertical: 14,
+    backgroundColor: UI.card,
+    borderRadius: 16,
+    paddingVertical: 16,
     alignItems: "center",
+    ...cardShadow,
   },
-  statValue: { fontSize: 20, fontWeight: "bold", color: DARK },
+  statValue: { fontSize: 22, fontWeight: "800", color: DARK },
   statLabel: { fontSize: 11, color: GRAY, marginTop: 4, textAlign: "center" },
 
   sectionTitle: {
     alignSelf: "flex-start",
-    fontSize: 13,
+    fontSize: 12,
+    fontWeight: "600",
     color: GRAY,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
     marginBottom: 8,
     marginTop: 4,
+    marginLeft: 4,
   },
 
   card: {
     alignSelf: "stretch",
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 12,
+    backgroundColor: UI.card,
+    borderRadius: 16,
     marginBottom: 20,
-    overflow: "hidden",
+    ...cardShadow,
   },
   row: {
     flexDirection: "row",
@@ -251,7 +253,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER,
+    borderBottomColor: UI.hairline,
   },
   rowIcon: { width: 28 },
   rowLabel: { flex: 1, fontSize: 15, color: DARK },

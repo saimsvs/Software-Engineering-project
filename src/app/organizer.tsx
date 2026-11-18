@@ -1,6 +1,7 @@
 import { clearToken } from "@/utils/storage";
 import { useRouter } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { UI } from "@/constants/ui";
 
 const DARK = "#1A1A1A";
 
@@ -28,7 +29,7 @@ export default function OrganizerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: UI.bg,
     paddingHorizontal: 20,
   },
   content: {

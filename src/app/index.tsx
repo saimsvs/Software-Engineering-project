@@ -47,7 +47,7 @@ export default function Index() {
 const styles = StyleSheet.create({
   splash: {
     flex: 1,
-    backgroundColor: "#FFF",
+    backgroundColor: "#F5F7F5",
     justifyContent: "center",
     alignItems: "center",
   },

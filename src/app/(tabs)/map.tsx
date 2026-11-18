@@ -27,7 +27,7 @@ export default function MapScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFF" },
+  safe: { flex: 1, backgroundColor: "#F5F7F5" },
   center: {
     flex: 1,
     justifyContent: "center",

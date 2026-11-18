@@ -1,6 +1,7 @@
 import { Logo } from "@/components/logo";
 import { ACTIVITIES, calcEmission, type IconName } from "@/data/activities";
 import { Ionicons } from "@expo/vector-icons";
+import { TAB_BAR_CLEARANCE, UI, cardShadow } from "@/constants/ui";
 import { onSync } from "@/services/offlineSync";
 import { PendingOperation } from "@/types/offline";
 import { cacheActivities, getCachedActivities } from "@/utils/activityCache";
@@ -22,7 +23,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
 const LIGHT_GREEN = "#E8F5E9";
-const BORDER = "#E0E0E0";
 const GRAY = "#666";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -345,7 +345,8 @@ const onEdit=(item: RecentItem)=>{
           activeOpacity={0.85}
           onPress={() => router.push("/log/activity")}
         >
-          <Text style={styles.ctaText}>+   Log Activity</Text>
+          <Ionicons name="add-circle-outline" size={20} color="#FFF" />
+          <Text style={styles.ctaText}>Log Activity</Text>
         </TouchableOpacity>
 
         <View style={styles.sectionRow}>
@@ -414,8 +415,8 @@ const onEdit=(item: RecentItem)=>{
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFF" },
-  content: { paddingHorizontal: 20, paddingBottom: 110 },
+  safe: { flex: 1, backgroundColor: UI.bg },
+  content: { paddingHorizontal: 20, paddingBottom: TAB_BAR_CLEARANCE },
 
   greetingRow: {
     flexDirection: "row",
@@ -432,21 +433,22 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: LIGHT_GREEN,
+    backgroundColor: UI.card,
     justifyContent: "center",
     alignItems: "center",
+    ...cardShadow,
   },
 
   hero: {
-    backgroundColor: LIGHT_GREEN,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    backgroundColor: UI.greenDark,
+    borderRadius: 22,
+    padding: 22,
+    marginBottom: 14,
   },
-  heroLabel: { fontSize: 13, fontWeight: "600", color: GREEN },
+  heroLabel: { fontSize: 13, fontWeight: "600", color: "rgba(255,255,255,0.75)", letterSpacing: 0.3 },
   heroValueRow: { flexDirection: "row", alignItems: "baseline", marginTop: 6 },
-  heroValue: { fontSize: 40, fontWeight: "bold", color: DARK },
-  heroUnit: { fontSize: 16, color: GRAY, marginLeft: 8 },
+  heroValue: { fontSize: 44, fontWeight: "800", color: "#FFF", letterSpacing: -1 },
+  heroUnit: { fontSize: 16, color: "rgba(255,255,255,0.75)", marginLeft: 8 },
   pill: {
     alignSelf: "flex-start",
     backgroundColor: "#FFF",
@@ -459,11 +461,14 @@ const styles = StyleSheet.create({
 
   cta: {
     backgroundColor: GREEN,
-    borderRadius: 10,
-    height: 52,
+    borderRadius: 16,
+    height: 54,
+    flexDirection: "row",
+    gap: 8,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 28,
+    ...cardShadow,
   },
   ctaText: { color: "#FFF", fontSize: 16, fontWeight: "600" },
 
@@ -473,15 +478,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "bold", color: DARK, marginBottom: 12 },
+  sectionTitle: { fontSize: 17, fontWeight: "700", color: DARK, marginBottom: 12, letterSpacing: -0.2 },
   link: { fontSize: 13, color: GREEN, fontWeight: "600" },
 
   chartCard: {
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 10,
+    backgroundColor: UI.card,
+    borderRadius: UI.radius,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 28,
+    ...cardShadow,
   },
   barsRow: {
     flexDirection: "row",
@@ -498,17 +503,11 @@ const styles = StyleSheet.create({
   activityRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#EFEFEF",
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    backgroundColor: UI.card,
+    ...cardShadow,
   },
   activityInner: {
     flex: 1,
@@ -543,7 +542,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#F3F4F3",
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 8,

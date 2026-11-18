@@ -14,13 +14,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { UI, cardShadow } from "@/constants/ui";
 import { ScreenHeader } from "@/components/screen-header";
 import { newId } from "@/utils/id";
 
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
 const LIGHT_GREEN = "#E8F5E9";
-const BORDER = "#E0E0E0";
 const GRAY = "#666";
 
 export default function ReviewScreen() {
@@ -182,7 +182,7 @@ export default function ReviewScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFF" },
+  safe: { flex: 1, backgroundColor: UI.bg },
 
   header: {
     flexDirection: "row",
@@ -203,10 +203,10 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingBottom: 24 },
 
   card: {
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: UI.card,
+    borderRadius: 16,
+    padding: 18,
+    ...cardShadow,
   },
   cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
   emojiCircle: {
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
 
   row: { fontSize: 15, color: DARK, marginBottom: 12 },
 
-  emissionBox: { backgroundColor: LIGHT_GREEN, borderRadius: 10, padding: 14 },
+  emissionBox: { backgroundColor: LIGHT_GREEN, borderRadius: 14, padding: 14 },
   emissionLabel: { fontSize: 11, fontWeight: "700", color: GREEN, letterSpacing: 0.5 },
   emissionValue: { fontSize: 28, fontWeight: "bold", color: DARK, marginTop: 4 },
   emissionMeta: { fontSize: 12, color: GRAY, marginTop: 4 },
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
 
   infoBox: {
     backgroundColor: "#EEF4FF",
-    borderRadius: 10,
+    borderRadius: 14,
     padding: 14,
     marginTop: 16,
   },
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 4 },
   saveBtn: {
     backgroundColor: GREEN,
-    borderRadius: 10,
+    borderRadius: 14,
     height: 52,
     justifyContent: "center",
     alignItems: "center",
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   editBtn: {
     borderWidth: 1.5,
     borderColor: DARK,
-    borderRadius: 10,
+    borderRadius: 14,
     height: 52,
     justifyContent: "center",
     alignItems: "center",

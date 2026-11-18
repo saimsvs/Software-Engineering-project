@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { UI } from "@/constants/ui";
 
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
@@ -185,7 +186,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: UI.bg,
   },
   content: {
     paddingHorizontal: 20,

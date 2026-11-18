@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { UI, cardShadow } from "@/constants/ui";
 import { useRouter } from "expo-router";
 import { ReactNode } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -66,15 +67,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     minHeight: 56,
     paddingHorizontal: 12,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E9E9EC",
+    backgroundColor: UI.bg,
   },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F5F5F7",
+    backgroundColor: UI.card,
+    ...cardShadow,
     alignItems: "center",
     justifyContent: "center",
   },
