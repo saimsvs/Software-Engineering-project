@@ -62,6 +62,8 @@ export default function RootLayout() {
           <Stack.Screen name="log/details" />
           <Stack.Screen name="log/review" />
           <Stack.Screen name="profile" />
+          <Stack.Screen name="privacy" />
+          <Stack.Screen name="goals" />
           <Stack.Screen name="stats" />
         </Stack>
       </SafeAreaView>

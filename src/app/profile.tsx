@@ -153,6 +153,12 @@ export default function ProfileScreen() {
           />
         </View>
 
+        <Text style={styles.sectionTitle}>Sustainability & Community</Text>
+        <View style={styles.card}>
+          <Row icon="🔒" label="Privacy & Location" onPress={() => router.push("/privacy")} />
+          <Row icon="🎯" label="My Goals" onPress={() => router.push("/goals")} />
+        </View>
+
         <Text style={styles.sectionTitle}>Account</Text>
         <View style={styles.card}>
           <Row
