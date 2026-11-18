@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import authRoutes from "./routes/auth.js";
+import featuresRoutes from "./routes/features.js";
 
 export function createApp() {
   const app = express();
@@ -17,6 +18,7 @@ export function createApp() {
   });
 
   app.use("/api/auth", authRoutes);
+  app.use("/api/features", featuresRoutes);
 
   return app;
 }
