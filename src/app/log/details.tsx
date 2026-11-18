@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { ScreenHeader } from "@/components/screen-header";
 
 const GREEN = "#2E7D32";
@@ -63,7 +64,7 @@ const [note, setNote] = useState(startNote ?? "");
         <StepIndicator current={2} label="Enter Details" />
 
         <View style={styles.activityCard}>
-          <Text style={styles.activityEmoji}>{activity.emoji}</Text>
+          <Ionicons name={activity.icon} size={24} color={GREEN} style={styles.activityIcon} />
           <Text style={styles.activityName}>{activity.name}</Text>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{activity.category}</Text>
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 24,
   },
-  activityEmoji: { fontSize: 24, marginRight: 10 },
+  activityIcon: { marginRight: 10 },
   activityName: { flex: 1, fontSize: 16, fontWeight: "600", color: DARK },
   badge: {
     backgroundColor: LIGHT_GREEN,

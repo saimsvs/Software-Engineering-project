@@ -7,10 +7,31 @@ import { env } from "../config/env.js";
 import { requireAuth } from "../middleware/auth.js";
 import { compareCodes, generateVerificationCode, hashCode } from "../utils/crypto.js";
 import { sendVerificationCode } from "../services/email.js";
+import { generateUniqueUsername } from "../utils/username.js";
 const router = Router();
 
+// Replace any old codes for this user with a fresh one and email it.
+async function issueVerificationCode(user: { id: string; email: string; name: string }) {
+  await prisma.emailVerificationCode.deleteMany({ where: { userId: user.id } });
+
+  const code = generateVerificationCode();
+  await prisma.emailVerificationCode.create({
+    data: {
+      codeHash: hashCode(code),
+      userId: user.id,
+      expiresAt: new Date(Date.now() + env.verificationCodeExpMin * 60 * 1000),
+    },
+  });
+
+  try {
+    await sendVerificationCode({ to: user.email, name: user.name, code });
+  } catch (error) {
+    console.error("Error sending verification email:", error);
+  }
+}
+
 const registerSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().trim().min(1),
   email: z.string().email(),
   password: z.string().min(8),
 });
@@ -41,15 +62,30 @@ router.post("/register", async (req, res) => {
   const { name, email, password } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
+  if (existing?.emailVerified) {
     return res.status(400).json({ message: "Email already registered" });
   }
 
+  // An unverified account means someone started signing up but never entered
+  // the code. Let them register again: take the new name/password and send a
+  // fresh code instead of locking the email out.
   const passwordHash = await bcrypt.hash(password, 12);
-  const user = await prisma.user.create({
-    data: { name, email, passwordHash, emailVerified: false },
-    select: { id: true, name: true, email: true, createdAt: true },
-  });
+  const user = existing
+    ? await prisma.user.update({
+        where: { id: existing.id },
+        data: { name, passwordHash },
+        select: { id: true, name: true, email: true, createdAt: true },
+      })
+    : await prisma.user.create({
+        data: {
+          name,
+          username: await generateUniqueUsername(name),
+          email,
+          passwordHash,
+          emailVerified: false,
+        },
+        select: { id: true, name: true, email: true, createdAt: true },
+      });
 
   // Delete any existing verification codes for this user
   await prisma.emailVerificationCode.deleteMany({
@@ -243,12 +279,23 @@ router.post("/login", async (req, res) => {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
+  // Sign-up was never finished: send a fresh code and make the app show the
+  // verification screen instead of logging in.
+  if (!user.emailVerified) {
+    await issueVerificationCode(user);
+    return res.status(403).json({
+      message: "Please verify your email. We've sent you a new code.",
+      code: "EMAIL_NOT_VERIFIED",
+      email: user.email,
+    });
+  }
+
   const token = jwt.sign({ userId: user.id, role: "user" }, env.jwtSecret, {
     expiresIn: env.jwtExpiresIn,
   });
 
   res.json({
-    user: { id: user.id, name: user.name, email: user.email, role: "user" },
+    user: { id: user.id, name: user.name, username: user.username, email: user.email, role: "user" },
     token,
   });
 });
@@ -256,7 +303,7 @@ router.post("/login", async (req, res) => {
 router.get("/me", requireAuth, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.userId },
-    select: { id: true, name: true, email: true, emailVerified: true, createdAt: true },
+    select: { id: true, name: true, username: true, email: true, emailVerified: true, createdAt: true },
   });
   if (!user) return res.status(404).json({ message: "User not found" });
   res.json({ user });

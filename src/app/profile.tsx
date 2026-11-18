@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "@/components/screen-header";
+import type { IconName } from "@/data/activities";
+import { Ionicons } from "@expo/vector-icons";
 
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
@@ -24,6 +26,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [name, setName] = useState("...");
   const [email, setEmail] = useState("...");
+  const [username, setUsername] = useState("");
   const [daysActive, setDaysActive] = useState(1);
   const [totalKg, setTotalKg] = useState(0);
   const [activityCount, setActivityCount] = useState(0);
@@ -39,6 +42,7 @@ export default function ProfileScreen() {
           const { user } = await meRes.json();
           setName(user.name);
           setEmail(user.email);
+          setUsername(user.username ?? "");
           const days = Math.max(
             1,
             Math.ceil((Date.now() - new Date(user.createdAt).getTime()) / 86400000)
@@ -81,7 +85,7 @@ export default function ProfileScreen() {
     danger,
     onPress,
   }: {
-    icon: string;
+    icon: IconName;
     label: string;
     value?: string;
     right?: React.ReactNode;
@@ -94,7 +98,7 @@ export default function ProfileScreen() {
       onPress={onPress}
       disabled={!onPress && !right}
     >
-      <Text style={styles.rowIcon}>{icon}</Text>
+      <Ionicons name={icon} size={18} color={danger ? RED : GRAY} style={styles.rowIcon} />
       <Text style={[styles.rowLabel, danger && { color: RED }]}>{label}</Text>
       {value ? (
         <View style={styles.rowBadge}>
@@ -112,14 +116,15 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.avatarWrap}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarIcon}>👤</Text>
+            <Ionicons name="person" size={40} color={GREEN} />
           </View>
           <View style={styles.cameraBadge}>
-            <Text style={styles.cameraIcon}>📷</Text>
+            <Ionicons name="camera-outline" size={14} color={DARK} />
           </View>
         </View>
 
         <Text style={styles.name}>{name}</Text>
+        {!!username && <Text style={styles.username}>@{username}</Text>}
         <Text style={styles.email}>{email}</Text>
 
         <View style={styles.statsRow}>
@@ -139,9 +144,9 @@ export default function ProfileScreen() {
 
         <Text style={styles.sectionTitle}>Settings</Text>
         <View style={styles.card}>
-          <Row icon="👤" label="Edit Profile" onPress={() => Alert.alert("Edit Profile", "Coming soon")} />
+          <Row icon="create-outline" label="Edit Profile" onPress={() => Alert.alert("Edit Profile", "Coming soon")} />
           <Row
-            icon="📏"
+            icon="resize-outline"
             label="Units (km / miles)"
             value="km"
             onPress={() => Alert.alert("Units", "Default: km")}
@@ -151,11 +156,11 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>Account</Text>
         <View style={styles.card}>
           <Row
-            icon="📊"
+            icon="download-outline"
             label="Export Data"
             onPress={() => Alert.alert("Export", "Coming soon")}
           />
-          <Row icon="🚪" label="Log Out" danger onPress={onLogout} />
+          <Row icon="log-out-outline" label="Log Out" danger onPress={onLogout} />
         </View>
 
         <Text style={styles.version}>CarbonTrail v1.0.0</Text>
@@ -194,7 +199,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarIcon: { fontSize: 44 },
   cameraBadge: {
     position: "absolute",
     right: -2,
@@ -208,9 +212,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  cameraIcon: { fontSize: 14 },
 
   name: { fontSize: 22, fontWeight: "bold", color: DARK },
+  username: { fontSize: 14, fontWeight: "600", color: GREEN, marginTop: 2 },
   email: { fontSize: 14, color: GRAY, marginTop: 2, marginBottom: 18 },
 
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 24, alignSelf: "stretch" },
@@ -249,7 +253,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: BORDER,
   },
-  rowIcon: { fontSize: 16, width: 28 },
+  rowIcon: { width: 28 },
   rowLabel: { flex: 1, fontSize: 15, color: DARK },
   rowBadge: {
     backgroundColor: LIGHT_GREEN,

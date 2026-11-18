@@ -1,4 +1,5 @@
 import { Logo } from "@/components/logo";
+import { Ionicons } from "@expo/vector-icons";
 import { API_URL } from "@/config/api";
 import { saveToken } from "@/utils/storage";
 import { useRouter } from "expo-router";
@@ -37,6 +38,17 @@ export default function LoginScreen() {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
+
+      if (res.status === 403 && data.code === "EMAIL_NOT_VERIFIED") {
+        Alert.alert("Verify your email", data.message, [
+          {
+            text: "OK",
+            onPress: () =>
+              router.push({ pathname: "/verify-code", params: { email: data.email ?? email } }),
+          },
+        ]);
+        return;
+      }
 
       if (!res.ok) {
         Alert.alert("Error", data.message || "Login failed");
@@ -95,7 +107,7 @@ export default function LoginScreen() {
           secureTextEntry={!showPassword}
         />
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-          <Text style={styles.eye}>{showPassword ? "🙈" : "👁"}</Text>
+          <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#666" style={styles.eye} />
         </TouchableOpacity>
       </View>
 
@@ -201,7 +213,6 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   eye: {
-    fontSize: 18,
     paddingHorizontal: 14,
   },
   forgot: {

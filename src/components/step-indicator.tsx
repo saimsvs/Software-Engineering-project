@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
 const GREEN = "#2E7D32";
@@ -13,9 +14,11 @@ export function StepIndicator({ current, label }: { current: 1 | 2 | 3; label: s
           return (
             <View key={s} style={styles.stepGroup}>
               <View style={[styles.circle, highlighted && styles.circleActive]}>
-                <Text style={[styles.num, highlighted && styles.numActive]}>
-                  {done ? "✓" : s}
-                </Text>
+                {done ? (
+                  <Ionicons name="checkmark" size={16} color="#FFF" />
+                ) : (
+                  <Text style={[styles.num, highlighted && styles.numActive]}>{s}</Text>
+                )}
               </View>
               {s < 3 && <View style={styles.line} />}
             </View>

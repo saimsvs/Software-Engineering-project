@@ -25,6 +25,7 @@ type Relationship = "none" | "connected" | "request_sent" | "request_received";
 type Person = {
   id: string;
   name: string;
+  username: string;
   relationship: Relationship;
   connectionId?: string;
 };
@@ -32,13 +33,13 @@ type Person = {
 type ConnectionItem = {
   id: string;
   connectedAt: string | null;
-  user: { id: string; name: string };
+  user: { id: string; name: string; username: string };
 };
 
 type RequestItem = {
   id: string;
   createdAt: string;
-  user: { id: string; name: string };
+  user: { id: string; name: string; username: string };
 };
 
 function initials(name: string): string {
@@ -244,7 +245,7 @@ export default function CommunityScreen() {
           <Ionicons name="search" size={18} color={GRAY} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by name or email"
+            placeholder="Search by name, username or email"
             placeholderTextColor="#9E9E9E"
             value={query}
             onChangeText={setQuery}
@@ -277,6 +278,9 @@ export default function CommunityScreen() {
                 </View>
                 <View style={styles.personInfo}>
                   <Text style={styles.personName}>{item.user.name}</Text>
+                  {!!item.user.username && (
+                    <Text style={styles.personUsername}>@{item.user.username}</Text>
+                  )}
                   <Text style={styles.personMeta}>Wants to connect</Text>
                 </View>
                 <TouchableOpacity
@@ -310,6 +314,9 @@ export default function CommunityScreen() {
                 </View>
                 <View style={styles.personInfo}>
                   <Text style={styles.personName}>{item.user.name}</Text>
+                  {!!item.user.username && (
+                    <Text style={styles.personUsername}>@{item.user.username}</Text>
+                  )}
                   <Text style={styles.personMeta}>Connected</Text>
                 </View>
                 <TouchableOpacity
@@ -343,6 +350,9 @@ export default function CommunityScreen() {
             </View>
             <View style={styles.personInfo}>
               <Text style={styles.personName}>{person.name}</Text>
+              {!!person.username && (
+                <Text style={styles.personUsername}>@{person.username}</Text>
+              )}
               <Text style={styles.personMeta}>
                 {person.relationship === "connected"
                   ? "Connected"
@@ -412,6 +422,7 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 16, fontWeight: "700", color: GREEN },
   personInfo: { flex: 1, marginLeft: 12 },
   personName: { fontSize: 15, fontWeight: "600", color: DARK },
+  personUsername: { fontSize: 13, color: GREEN, marginTop: 1 },
   personMeta: { fontSize: 12, color: GRAY, marginTop: 2 },
 
   primaryBtn: {

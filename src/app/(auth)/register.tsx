@@ -1,4 +1,5 @@
 import { Logo } from "@/components/logo";
+import { Ionicons } from "@expo/vector-icons";
 import { API_URL } from "@/config/api";
 import { saveToken } from "@/utils/storage";
 import { useRouter } from "expo-router";
@@ -124,7 +125,7 @@ export default function RegisterScreen() {
           secureTextEntry={!showPassword}
         />
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-          <Text style={styles.eye}>{showPassword ? "🙈" : "👁"}</Text>
+          <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#666" style={styles.eye} />
         </TouchableOpacity>
       </View>
 
@@ -139,7 +140,7 @@ export default function RegisterScreen() {
           secureTextEntry={!showConfirm}
         />
         <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>
-          <Text style={styles.eye}>{showConfirm ? "🙈" : "👁"}</Text>
+          <Ionicons name={showConfirm ? "eye-off-outline" : "eye-outline"} size={20} color="#666" style={styles.eye} />
         </TouchableOpacity>
       </View>
 
@@ -148,7 +149,7 @@ export default function RegisterScreen() {
         onPress={() => setAgreed(!agreed)}
       >
         <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
-          {agreed && <Text style={styles.checkmark}>✓</Text>}
+          {agreed && <Ionicons name="checkmark" size={14} color="#FFF" />}
         </View>
         <Text style={styles.termsText}>
           I agree to Terms of Service and Privacy Policy
@@ -259,7 +260,6 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   eye: {
-    fontSize: 18,
     paddingHorizontal: 14,
   },
   checkboxRow: {
@@ -280,11 +280,6 @@ const styles = StyleSheet.create({
   checkboxChecked: {
     backgroundColor: GREEN,
     borderColor: GREEN,
-  },
-  checkmark: {
-    color: "#FFF",
-    fontSize: 13,
-    fontWeight: "bold",
   },
   termsText: {
     fontSize: 13,

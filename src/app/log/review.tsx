@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { ScreenHeader } from "@/components/screen-header";
 import { newId } from "@/utils/id";
 
@@ -129,7 +130,7 @@ export default function ReviewScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.emojiCircle}>
-              <Text style={styles.emoji}>{activity.emoji}</Text>
+              <Ionicons name={activity.icon} size={20} color={GREEN} />
             </View>
             <Text style={styles.activityName}>{activity.name}</Text>
             <View style={styles.badge}>
@@ -165,7 +166,7 @@ export default function ReviewScreen() {
           disabled={saving}
         >
           <Text style={styles.saveText}>
-            {saving ? "Saving…" : editId ? "✓ Save Changes" : "✓ Save Activity"}
+            {saving ? "Saving…" : editId ? "Save Changes" : "Save Activity"}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -217,7 +218,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 10,
   },
-  emoji: { fontSize: 20 },
   activityName: { flex: 1, fontSize: 16, fontWeight: "bold", color: DARK },
   badge: {
     backgroundColor: LIGHT_GREEN,

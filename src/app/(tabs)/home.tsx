@@ -1,5 +1,6 @@
 import { Logo } from "@/components/logo";
-import { ACTIVITIES, calcEmission } from "@/data/activities";
+import { ACTIVITIES, calcEmission, type IconName } from "@/data/activities";
+import { Ionicons } from "@expo/vector-icons";
 import { onSync } from "@/services/offlineSync";
 import { PendingOperation } from "@/types/offline";
 import { cacheActivities, getCachedActivities } from "@/utils/activityCache";
@@ -28,7 +29,7 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 type RecentItem = {
   id: string;
-  emoji: string;
+  icon: IconName;
   name: string;
   time: string;
   kg: string;
@@ -117,7 +118,7 @@ function toRecent(entry: LogEntry, pending = false, local = false): RecentItem {
   const meta = ACTIVITIES.find((x) => x.id === entry.activityId);
   return {
     id: entry.id,
-    emoji: meta?.emoji ?? "🌿",
+    icon: meta?.icon ?? "leaf-outline",
     name: meta?.name ?? entry.activityId,
     time: formatTime(entry.createdAt),
     kg: `${entry.emission} kg`,
@@ -318,7 +319,7 @@ const onEdit=(item: RecentItem)=>{
             activeOpacity={0.7}
             onPress={() => router.push("/profile")}
           >
-            <Text style={styles.avatarIcon}>👤</Text>
+            <Ionicons name="person-outline" size={18} color={DARK} />
           </TouchableOpacity>
         </View>
 
@@ -386,7 +387,7 @@ const onEdit=(item: RecentItem)=>{
   >
           <View key={a.id} style={styles.activityInner}>
             <View style={styles.emojiCircle}>
-              <Text style={styles.emoji}>{a.emoji}</Text>
+              <Ionicons name={a.icon} size={18} color={GREEN} />
             </View>
             <View style={styles.activityInfo}>
               <Text style={styles.activityName}>{a.name}</Text>
@@ -402,7 +403,7 @@ const onEdit=(item: RecentItem)=>{
               onPress={() => onDelete(a)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.deleteIcon}>✕</Text>
+              <Ionicons name="close" size={16} color="#999" />
             </TouchableOpacity>
           </View>
           </TouchableOpacity>
@@ -435,7 +436,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarIcon: { fontSize: 18 },
 
   hero: {
     backgroundColor: LIGHT_GREEN,
@@ -523,7 +523,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  emoji: { fontSize: 16 },
   activityInfo: { flex: 1, marginLeft: 12 },
   activityName: { fontSize: 15, fontWeight: "600", color: DARK },
   activityTime: { fontSize: 12, color: GRAY, marginTop: 2 },
@@ -549,6 +548,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginLeft: 8,
   },
-  deleteIcon: { fontSize: 12, color: "#999" },
   emptyText: { fontSize: 14, color: GRAY, textAlign: "center", marginVertical: 16 },
 });

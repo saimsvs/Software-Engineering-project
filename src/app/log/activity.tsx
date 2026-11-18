@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { ScreenHeader } from "@/components/screen-header";
 
 
@@ -81,8 +82,10 @@ const [selected, setSelected] = useState<string | null>(incoming?.id ?? null);
                   activeOpacity={0.8}
                   onPress={() => setSelected(a.id)}
                 >
-                  {isSelected && <Text style={styles.check}>✓</Text>}
-                  <Text style={styles.cardEmoji}>{a.emoji}</Text>
+                  {isSelected && (
+                    <Ionicons name="checkmark-circle" size={18} color={GREEN} style={styles.check} />
+                  )}
+                  <Ionicons name={a.icon} size={32} color={GREEN} style={styles.cardIcon} />
                   <Text style={styles.cardName}>{a.name}</Text>
                   <Text style={styles.cardUnit}>{a.unit}</Text>
                 </TouchableOpacity>
@@ -157,12 +160,9 @@ const styles = StyleSheet.create({
   check: {
     position: "absolute",
     top: 8,
-    right: 10,
-    fontSize: 14,
-    color: GREEN,
-    fontWeight: "bold",
+    right: 8,
   },
-  cardEmoji: { fontSize: 34, marginBottom: 8 },
+  cardIcon: { marginBottom: 8 },
   cardName: { fontSize: 14, fontWeight: "600", color: DARK, textAlign: "center" },
   cardUnit: { fontSize: 12, color: GRAY, marginTop: 4 },
 
