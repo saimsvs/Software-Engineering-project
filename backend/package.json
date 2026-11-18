@@ -9,7 +9,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "render-build": "prisma generate --config prisma7.config.ts && prisma migrate deploy --config prisma7.config.ts"
+    "render-build": "prisma generate --config prisma7.config.ts && prisma migrate deploy --config prisma7.config.ts",
+    "create-organizer": "tsx src/scripts/create-organizer.ts"
   },
   "keywords": [],
   "author": "",
