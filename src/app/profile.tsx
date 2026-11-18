@@ -155,8 +155,8 @@ export default function ProfileScreen() {
 
         <Text style={styles.sectionTitle}>Sustainability & Community</Text>
         <View style={styles.card}>
-          <Row icon="🔒" label="Privacy & Location" onPress={() => router.push("/privacy")} />
-          <Row icon="🎯" label="My Goals" onPress={() => router.push("/goals")} />
+          <Row icon="lock-closed-outline" label="Privacy & Location" onPress={() => router.push("/privacy")} />
+          <Row icon="flag-outline" label="My Goals" onPress={() => router.push("/goals")} />
         </View>
 
         <Text style={styles.sectionTitle}>Account</Text>

@@ -40,16 +40,24 @@ def catmull(pts, closed, n=12, corner_idx=None):
     if not closed: out.append(pts[-1])
     else: out.append(out[0])
     return out
+def stroke(d, pts, width, fill):
+    """Smooth round-capped stroke: stamp overlapping discs densely along the path
+    (avoids the hairline gaps PIL leaves between many short thick segments)."""
+    r = width / 2
+    step = max(1.0, width / 8)
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        seg = max(abs(x1 - x0), abs(y1 - y0))
+        n = max(1, int(seg / step))
+        for k in range(n + 1):
+            x = x0 + (x1 - x0) * k / n
+            y = y0 + (y1 - y0) * k / n
+            d.ellipse((x - r, y - r, x + r, y + r), fill=fill)
+
 def draw_leaf(d, scale, ox, oy, width, fill):
     T=lambda pts:[(ox+x*scale, oy+y*scale) for x,y in pts]
-    d.line(T(catmull(OUTLINE,True,corner_idx=0)), fill=fill, width=width, joint="curve")
+    stroke(d, T(catmull(OUTLINE, True, corner_idx=0)), width, fill)
     for v in VEINS:
-        pts=T(v if len(v)==2 else catmull(v,False))
-        d.line(pts, fill=fill, width=width, joint="curve")
-    r=width/2
-    for v in VEINS:
-        for (x,y) in (v[0],v[-1]):
-            X,Y=ox+x*scale,oy+y*scale; d.ellipse((X-r,Y-r,X+r,Y+r),fill=fill)
+        stroke(d, T(v if len(v) == 2 else catmull(v, False)), width, fill)
 
 # Ring in the original logo: centre (41, 49.5), outer diameter 64.
 RING_CX, RING_CY, RING_D = 41.0, 49.5, 64.0

@@ -31,10 +31,30 @@ async function issueVerificationCode(user: { id: string; email: string; name: st
 }
 
 const registerSchema = z.object({
-  name: z.string().trim().min(1),
-  email: z.string().email(),
-  password: z.string().min(8),
+  name: z
+    .string({ error: "Please enter your name" })
+    .trim()
+    .min(1, "Please enter your name")
+    .max(60, "Name must be 60 characters or fewer"),
+  email: z
+    .string({ error: "Please enter your email" })
+    .trim()
+    .email("Enter a valid email address, like name@example.com"),
+  password: z
+    .string({ error: "Please enter a password" })
+    .min(8, "Password must be at least 8 characters")
+    .max(72, "Password must be 72 characters or fewer"),
 });
+
+/** First error per field, e.g. { email: "Enter a valid email address" }. */
+function fieldErrorsOf(error: z.ZodError): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const field = String(issue.path[0] ?? "form");
+    if (!out[field]) out[field] = issue.message;
+  }
+  return out;
+}
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -54,16 +74,21 @@ const resendCodeSchema = z.object({
 router.post("/register", async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res
-      .status(400)
-      .json({ message: "Invalid input", errors: parsed.error.flatten() });
+    const fieldErrors = fieldErrorsOf(parsed.error);
+    return res.status(400).json({
+      message: Object.values(fieldErrors)[0] ?? "Please check the form and try again",
+      fieldErrors,
+    });
   }
 
   const { name, email, password } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing?.emailVerified) {
-    return res.status(400).json({ message: "Email already registered" });
+    return res.status(409).json({
+      message: "An account with this email already exists. Try logging in instead.",
+      fieldErrors: { email: "An account with this email already exists" },
+    });
   }
 
   // An unverified account means someone started signing up but never entered
