@@ -1,55 +1,61 @@
-
-import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-type ScreenHeaderProps = {
+const DARK = "#1A1A1A";
+
+/**
+ * Shared top bar for stack screens: circular back button + centered title.
+ * Gives every secondary screen the same professional header.
+ */
+export function ScreenHeader({
+  title,
+  onBack,
+}: {
   title: string;
-};
+  onBack?: () => void;
+}) {
+  const router = useRouter();
+  const back = onBack ?? (() => router.back());
 
-export function ScreenHeader({ title }: ScreenHeaderProps) {
   return (
-    <View style={styles.container}>
+    <View style={styles.header}>
       <TouchableOpacity
-        onPress={() => router.back()}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        style={styles.backButton}
+        onPress={back}
+        style={styles.backBtn}
+        activeOpacity={0.6}
+        hitSlop={10}
       >
-        <Text style={styles.backText}>{"‹"}</Text>
+        <Ionicons name="chevron-back" size={22} color={DARK} />
       </TouchableOpacity>
-
-      <Text style={styles.title}>{title}</Text>
-      <View style={styles.spacer} />
+      <Text style={styles.title} numberOfLines={1}>
+        {title}
+      </Text>
+      <View style={styles.backBtn} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    height: 60,
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
     paddingHorizontal: 16,
+    paddingVertical: 10,
   },
-  backButton: {
-    width: 40,
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#F4F4F5",
+    alignItems: "center",
     justifyContent: "center",
-  },
-  backText: {
-    fontSize: 32,
-    color: "#2E7D32",
   },
   title: {
     flex: 1,
     textAlign: "center",
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700",
-    color: "#1A1A1A",
-  },
-  spacer: {
-    width: 40,
+    color: DARK,
   },
 });

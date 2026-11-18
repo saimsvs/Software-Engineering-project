@@ -19,6 +19,29 @@ model User {
   goals             Goal[]
   activityLogs      ActivityLog[]
   verificationCodes EmailVerificationCode[]
+  connectionsAsA    Connection[]            @relation("ConnectionUserA")
+  connectionsAsB    Connection[]            @relation("ConnectionUserB")
+  connectionRequests Connection[]           @relation("ConnectionRequester")
+}
+
+model Connection {
+  id            String    @id @default(cuid())
+  // Canonical ordering: userAId < userBId, so a pair can only exist once
+  // regardless of who sent the request first.
+  userAId       String
+  userBId       String
+  requestedById String
+  status        String    @default("pending") // pending | accepted | rejected
+  createdAt     DateTime  @default(now())
+  respondedAt   DateTime?
+
+  userA       User @relation("ConnectionUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB       User @relation("ConnectionUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  requestedBy User @relation("ConnectionRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@index([userBId, status])
+  @@index([requestedById, status])
 }
 
 model EmailVerificationCode {
