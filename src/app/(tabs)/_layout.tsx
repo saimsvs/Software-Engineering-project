@@ -57,6 +57,9 @@ export default function TabLayout() {
         <TabTrigger name="home" href="/home" asChild>
           <TabButton icon="home-outline" iconActive="home" label="Home" />
         </TabTrigger>
+        <TabTrigger name="community" href="/community" asChild>
+          <TabButton icon="people-outline" iconActive="people" label="Community" />
+        </TabTrigger>
         <TabTrigger name="map" href="/map" asChild>
           <TabButton icon="map-outline" iconActive="map" label="Map" />
         </TabTrigger>

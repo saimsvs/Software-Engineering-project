@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import authRoutes from "./routes/auth.js";
+import { connectionsRouter, usersRouter } from "./routes/social.js";
 
 export function createApp() {
   const app = express();
@@ -17,6 +18,8 @@ export function createApp() {
   });
 
   app.use("/api/auth", authRoutes);
+  app.use("/api/users", usersRouter);
+  app.use("/api/connections", connectionsRouter);
 
   return app;
 }

@@ -19,6 +19,7 @@
 - Email delivery integration (Gmail SMTP): verification email sends successfully (functional smoke; deliverability is environment-dependent).
 - API validation/error handling: invalid inputs, expired/invalid codes, duplicate email, wrong password.
 - Basic UI/navigation: auth screens, verify screen, log flow, organizer blank screen.
+- Connections: discover/search users, send request, accept/reject, list connections, remove connection, duplicate prevention.
 
 **Out of scope (for now)**
 - Performance/load testing at scale.
@@ -78,6 +79,7 @@ Notes:
 | `backend/tests/crypto.test.ts` | Code generation, SHA-256 hashing, timing-safe comparison |
 | `backend/tests/auth.test.ts` | Registration, verification, resend, login, `/me`, organizer login |
 | `backend/tests/activity.test.ts` | Activity create/list/update/delete, emission math, ownership, auth |
+| `backend/tests/connections.test.ts` | User discovery/search, requests, accept/reject, duplicate prevention, removal |
 | `backend/tests/health.test.ts` | Health endpoint smoke test |
 
 ### 1.5 Entry / Exit Criteria
@@ -180,7 +182,37 @@ Notes:
 | SEC-003 | Input validation on auth endpoints | P1 | — | Send malformed JSON/missing fields. | 400 responses; server remains stable. |
 | SEC-004 | CORS/health endpoint | P3 | Backend running | `GET /api/health`. | Returns `{ status: "ok", ... }`. |
 
-### 2.7 Automation Coverage Map
+### 2.7 Connections
+
+User story: *As a user, I want to connect with other users so that I can interact with people interested in sustainability.*
+
+Sending a request from a challenge forum is **not implemented yet** (no challenge/forum feature exists); the Connect action lives in the Community tab for now.
+
+| ID | Title | Priority | Preconditions | Steps | Expected Result |
+|---|---|---:|---|---|---|
+| CONN-001 | Discover other users | P0 | Two or more accounts exist | Open Community with an empty search box. | Lists other users (never yourself) newest-first, with no email or password fields. |
+| CONN-002 | Search by name or email | P0 | Accounts exist | Type part of a name or email. | Case-insensitive matches only; no results shows an empty state. |
+| CONN-003 | Relationship state in results | P1 | A request exists between two users | Search for that user. | Result shows `request_sent` / `request_received` / `connected` with a connection id. |
+| CONN-004 | Send a connection request | P0 | Two accounts | Tap Connect on a user. | 201 with a pending connection; both users are stored in canonical order (`userAId < userBId`). |
+| CONN-005 | Cannot connect to yourself | P1 | Logged in | Request your own id. | 400 "You cannot send a connection request to yourself". |
+| CONN-006 | Request to unknown user | P2 | Logged in | Request a non-existent id. | 404 "User not found". |
+| CONN-007 | Duplicate request (same direction) | P0 | Pending request A→B | A requests B again. | 409 `REQUEST_ALREADY_SENT`; still exactly one row. |
+| CONN-008 | Duplicate request (reverse direction) | P0 | Pending request A→B | B requests A. | 409 `REQUEST_ALREADY_RECEIVED`; still exactly one row. |
+| CONN-009 | Duplicate after connecting | P1 | A and B are connected | Either requests again. | 409 `ALREADY_CONNECTED`. |
+| CONN-010 | Re-request after rejection | P2 | B rejected A | A requests B again. | 201; the existing row is reopened as pending. |
+| CONN-011 | Auth required to send | P0 | No token | POST `/api/connections`. | 401. |
+| CONN-012 | Accept a request | P0 | Pending request A→B | B accepts. | 200 accepted; appears in both users' connections; removed from pending inbox. |
+| CONN-013 | Requester cannot accept own request | P1 | Pending request A→B | A accepts. | 403; request stays pending. |
+| CONN-014 | Unrelated user cannot respond | P0 | Pending request A→B; C logged in | C accepts/rejects. | 404; request unchanged. |
+| CONN-015 | Reject a request | P0 | Pending request A→B | B rejects. | 200 rejected; disappears from inbox and from connections. |
+| CONN-016 | Cannot re-respond to a resolved request | P2 | Request already accepted/rejected | Respond again. | 400 "This request is no longer pending". |
+| CONN-017 | Incoming vs sent lists | P1 | Pending request A→B | B lists requests; A lists sent. | B sees the incoming request, A sees it under sent, each list excludes the other side. |
+| CONN-018 | Cancel a pending request | P1 | Pending request A→B | A deletes it. | 200; row removed; A can request again. |
+| CONN-019 | Remove a connection | P1 | A and B connected | Either user deletes the connection. | 200; gone from both connections lists. |
+| CONN-020 | Unrelated user cannot delete | P1 | Connection A↔B; C logged in | C deletes the connection. | 404; connection unchanged. |
+| CONN-021 | Auth on all endpoints | P0 | No token | Call users/connections endpoints. | 401 on every endpoint. |
+
+### 2.8 Automation Coverage Map
 
 Legend: **A** = automated (`npm test`), **M** = manual (device/emulator or real email).
 
@@ -191,6 +223,7 @@ Legend: **A** = automated (`npm test`), **M** = manual (device/emulator or real 
 | AUTH-LOG-001…007 | ACT UI flow inside the app (the API is automated) |
 | ORG-001, ORG-004, ORG-005 | OFF-001…008 (offline queue + sync on device) |
 | ACT-001…007 | SEC-001–004 spot-check against the deployed API |
+| CONN-001…021 | Community tab interaction (tap-through, keyboard, pull-to-refresh) |
 | SEC-002 (hash-at-rest), SEC-004 | Exploratory / usability sessions |
 
 Automated test names mirror the case IDs (`AUTH-REG-001`, `ACT-005`, …) so a failing run maps straight back to this document.

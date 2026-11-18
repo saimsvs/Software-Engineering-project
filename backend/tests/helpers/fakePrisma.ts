@@ -9,8 +9,36 @@
 
 type Row = Record<string, any>;
 
+function matchesValue(value: any, condition: any): boolean {
+  if (condition instanceof Date) return value === condition;
+  if (condition && typeof condition === "object" && !Array.isArray(condition)) {
+    if ("not" in condition) return value !== condition.not;
+    if ("in" in condition) return (condition.in as any[]).includes(value);
+    if ("contains" in condition) {
+      const haystack = String(value ?? "");
+      const needle = String(condition.contains);
+      return condition.mode === "insensitive"
+        ? haystack.toLowerCase().includes(needle.toLowerCase())
+        : haystack.includes(needle);
+    }
+    if ("equals" in condition) return value === condition.equals;
+  }
+  return value === condition;
+}
+
 function matches(row: Row, where: Row = {}): boolean {
-  return Object.entries(where).every(([key, value]) => row[key] === value);
+  return Object.entries(where).every(([key, condition]) => {
+    if (key === "OR") {
+      return (condition as Row[]).some((clause) => matches(row, clause));
+    }
+    if (key === "AND") {
+      return (condition as Row[]).every((clause) => matches(row, clause));
+    }
+    if (key === "NOT") {
+      return !matches(row, condition as Row);
+    }
+    return matchesValue(row[key], condition);
+  });
 }
 
 function pick(row: Row, select?: Row): Row {
@@ -42,6 +70,7 @@ export function createFakePrisma() {
   let codes: Row[] = [];
   let activities: Row[] = [];
   let organizers: Row[] = [];
+  let connections: Row[] = [];
 
   const nextId = (prefix: string) => `${prefix}_${++seq}`;
   // Monotonic timestamps keep "order by createdAt" deterministic in tests.
@@ -68,6 +97,13 @@ export function createFakePrisma() {
       if (!row) throw new Error("User not found");
       Object.assign(row, data, { updatedAt: now() });
       return { ...row };
+    },
+    findMany: async ({ where, orderBy, take, select }: any = {}) => {
+      const found = sortRows(
+        users.filter((u) => matches(u, where)),
+        orderBy
+      );
+      return (take ? found.slice(0, take) : found).map((row) => pick(row, select));
     },
   };
 
@@ -148,11 +184,54 @@ export function createFakePrisma() {
     },
   };
 
+  const connection = {
+    create: async ({ data }: any) => {
+      const row: Row = {
+        id: nextId("connection"),
+        status: "pending",
+        createdAt: now(),
+        respondedAt: null,
+        ...data,
+      };
+      connections.push(row);
+      return { ...row };
+    },
+    findUnique: async ({ where }: any) => {
+      const row = connections.find((c) => matches(c, where));
+      return row ? { ...row } : null;
+    },
+    findFirst: async ({ where }: any) => {
+      const row = connections.find((c) => matches(c, where));
+      return row ? { ...row } : null;
+    },
+    findMany: async ({ where, orderBy, take }: any = {}) => {
+      const found = sortRows(
+        connections.filter((c) => matches(c, where)),
+        orderBy
+      );
+      return (take ? found.slice(0, take) : found).map((row) => ({ ...row }));
+    },
+    update: async ({ where, data }: any) => {
+      const row = connections.find((c) => matches(c, where));
+      if (!row) throw new Error("Connection not found");
+      Object.assign(row, data);
+      return { ...row };
+    },
+    delete: async ({ where }: any) => {
+      const index = connections.findIndex((c) => matches(c, where));
+      if (index === -1) throw new Error("Connection not found");
+      return connections.splice(index, 1)[0];
+    },
+    count: async ({ where }: any = {}) =>
+      connections.filter((c) => matches(c, where)).length,
+  };
+
   return {
     user,
     emailVerificationCode,
     activityLog,
     organizer,
+    connection,
 
     reset() {
       seq = 0;
@@ -160,6 +239,7 @@ export function createFakePrisma() {
       codes = [];
       activities = [];
       organizers = [];
+      connections = [];
     },
 
     seed: {
@@ -202,6 +282,17 @@ export function createFakePrisma() {
         codes.push(row);
         return { ...row };
       },
+      connection(data: Row) {
+        const row: Row = {
+          id: nextId("connection"),
+          status: "pending",
+          createdAt: now(),
+          respondedAt: null,
+          ...data,
+        };
+        connections.push(row);
+        return { ...row };
+      },
     },
 
     // Escape hatches for assertions.
@@ -209,5 +300,6 @@ export function createFakePrisma() {
     _codes: () => codes,
     _activities: () => activities,
     _organizers: () => organizers,
+    _connections: () => connections,
   };
 }
