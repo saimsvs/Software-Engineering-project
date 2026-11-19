@@ -1,5 +1,6 @@
 import { Logo } from "@/components/logo";
 import { API_URL } from "@/config/api";
+import { backToLogin } from "@/utils/nav";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -79,12 +80,9 @@ export default function VerifyCodeScreen() {
         return;
       }
 
-      Alert.alert("Success", "Email verified successfully!", [
-        {
-          text: "OK",
-          onPress: () => router.replace("/login"),
-        },
-      ]);
+      // Back to the existing Login screen (dropping Register/Verify from the
+      // history), which shows an "Email verified" message.
+      backToLogin(router, { verified: "1" });
     } catch {
       Alert.alert("Error", "Cannot connect to server");
     } finally {
@@ -128,7 +126,7 @@ export default function VerifyCodeScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/login"))}>
+      <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : backToLogin(router))} accessibilityLabel="Go back">
         <Text style={styles.backArrow}>←</Text>
       </TouchableOpacity>
 
@@ -191,7 +189,7 @@ export default function VerifyCodeScreen() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity onPress={() => router.push("/login")}>
+      <TouchableOpacity onPress={() => backToLogin(router)}>
         <Text style={styles.loginText}>
           Back to <Text style={styles.loginLink}>Login</Text>
         </Text>

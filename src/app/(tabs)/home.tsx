@@ -393,6 +393,14 @@ const onEdit=(item: RecentItem)=>{
             <View style={styles.activityInfo}>
               <Text style={styles.activityName}>{a.name}</Text>
               <Text style={styles.activityTime}>{a.time}</Text>
+              {!!a.note && (
+                <View style={styles.noteRow}>
+                  <Ionicons name="document-text-outline" size={12} color={GRAY} />
+                  <Text style={styles.noteText} numberOfLines={2}>
+                    {a.note}
+                  </Text>
+                </View>
+              )}
               {a.pending && (
                 <Text style={styles.pendingBadge}>● Pending sync</Text>
               )}
@@ -525,6 +533,8 @@ const styles = StyleSheet.create({
   activityInfo: { flex: 1, marginLeft: 12 },
   activityName: { fontSize: 15, fontWeight: "600", color: DARK },
   activityTime: { fontSize: 12, color: GRAY, marginTop: 2 },
+  noteRow: { flexDirection: "row", alignItems: "flex-start", gap: 4, marginTop: 4 },
+  noteText: { flex: 1, fontSize: 12.5, color: "#4B5563", fontStyle: "italic" },
   pendingBadge: {
     alignSelf: "flex-start",
     marginTop: 4,

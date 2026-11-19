@@ -1,11 +1,11 @@
 import { Logo } from "@/components/logo";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL } from "@/config/api";
+import { resetTo } from "@/utils/nav";
 import { saveToken } from "@/utils/storage";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { UI } from "@/constants/ui";
 const DARK = "#1A1A1A";
+const RED = "#C62828";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -24,47 +25,43 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  // Set by the verify-code screen after a successful verification.
+  const { verified } = useLocalSearchParams<{ verified?: string }>();
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Error", "Please fill all fields");
+    if (!email.trim() || !password) {
+      setError("Please enter your email and password.");
       return;
     }
 
+    setError("");
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (res.status === 403 && data.code === "EMAIL_NOT_VERIFIED") {
-        Alert.alert("Verify your email", data.message, [
-          {
-            text: "OK",
-            onPress: () =>
-              router.push({ pathname: "/verify-code", params: { email: data.email ?? email } }),
-          },
-        ]);
+        // The backend has just emailed a fresh code; go straight to entering it.
+        router.push({ pathname: "/verify-code", params: { email: data.email ?? email.trim() } });
         return;
       }
 
       if (!res.ok) {
-        Alert.alert("Error", data.message || "Login failed");
+        setError(res.status === 401 ? "Incorrect email or password." : data.message || "Login failed. Please try again.");
         return;
       }
 
       await saveToken(data.token);
-      if (data.user?.role === "organizer") {
-        router.replace("/organizer");
-      } else {
-        Alert.alert("Success", "Logged in!");
-        router.replace("/home");
-      }
+      // Clear Login/Register/Verify from the history so "back" from the app
+      // doesn't return to them.
+      resetTo(router, data.user?.role === "organizer" ? "/organizer" : "/home");
     } catch {
-      Alert.alert("Error", "Cannot connect to server");
+      setError("Can't reach the server. Check your internet connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -77,9 +74,15 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-      <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}>
-        <Text style={styles.backArrow}>←</Text>
-      </TouchableOpacity>
+      {/* Login is usually the first screen: only offer "back" when there is
+          somewhere to go back to. */}
+      {router.canGoBack() ? (
+        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+          <Text style={styles.backArrow}>←</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.backSpacer} />
+      )}
 
       <View style={styles.logoContainer}>
         <Logo size={64} />
@@ -88,12 +91,22 @@ export default function LoginScreen() {
       <Text style={styles.title}>Welcome Back</Text>
       <Text style={styles.subtitle}>Track your carbon footprint</Text>
 
+      {verified === "1" && !error && (
+        <View style={[styles.banner, styles.bannerSuccess]} accessibilityLiveRegion="polite">
+          <Ionicons name="checkmark-circle" size={18} color={UI.green} />
+          <Text style={[styles.bannerText, { color: UI.greenDark }]}>Email verified. You can log in now.</Text>
+        </View>
+      )}
+
       <TextInput
         style={styles.input}
         placeholder="Email"
         placeholderTextColor="#999"
         value={email}
-        onChangeText={setEmail}
+        onChangeText={(v) => {
+          setEmail(v);
+          if (error) setError("");
+        }}
         keyboardType="email-address"
         autoCapitalize="none"
       />
@@ -104,7 +117,10 @@ export default function LoginScreen() {
           placeholder="Password"
           placeholderTextColor="#999"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(v) => {
+            setPassword(v);
+            if (error) setError("");
+          }}
           secureTextEntry={!showPassword}
         />
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
@@ -115,6 +131,13 @@ export default function LoginScreen() {
       <TouchableOpacity>
         <Text style={styles.forgot}>Forgot Password?</Text>
       </TouchableOpacity>
+
+      {!!error && (
+        <View style={[styles.banner, styles.bannerError]} accessibilityLiveRegion="polite">
+          <Ionicons name="alert-circle" size={18} color={RED} />
+          <Text style={[styles.bannerText, { color: RED }]}>{error}</Text>
+        </View>
+      )}
 
       <TouchableOpacity
         style={[styles.button, loading && { opacity: 0.6 }]}
@@ -157,6 +180,21 @@ const styles = StyleSheet.create({
     color: DARK,
     marginTop: 50,
   },
+  backSpacer: {
+    height: 84,
+  },
+  banner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  bannerError: { backgroundColor: "#FDECEA", marginTop: 4 },
+  bannerSuccess: { backgroundColor: UI.greenSoft },
+  bannerText: { flex: 1, fontSize: 13.5 },
   logoContainer: {
     alignItems: "center",
     marginTop: 20,

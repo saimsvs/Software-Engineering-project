@@ -1,6 +1,7 @@
 import { Logo } from "@/components/logo";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL } from "@/config/api";
+import { backToLogin } from "@/utils/nav";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -123,7 +124,7 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-      <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}>
+      <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : backToLogin(router))} accessibilityLabel="Go back">
         <Text style={styles.backArrow}>←</Text>
       </TouchableOpacity>
 
@@ -243,7 +244,7 @@ export default function RegisterScreen() {
         <View style={styles.line} />
       </View>
 
-      <TouchableOpacity onPress={() => router.push("/login")}>
+      <TouchableOpacity onPress={() => backToLogin(router)}>
         <Text style={styles.loginText}>
           Already have an account? <Text style={styles.loginLink}>Login</Text>
         </Text>

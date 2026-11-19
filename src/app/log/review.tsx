@@ -50,6 +50,15 @@ export default function ReviewScreen() {
       note: note || undefined,
     };
 
+    // Go back to the Home screen that's already underneath the 3 logging steps
+    // (rather than stacking a new Home on top of them, which made "back" from
+    // Home reopen the logging screens), then confirm. Navigating first also
+    // means a missing pop-up (e.g. on web) can't leave the user stuck here.
+    const doneSaving = (title: string, message: string) => {
+      router.dismissTo("/home");
+      Alert.alert(title, message);
+    };
+
     // Store the entry on this phone first, then let the sync service upload it
     // whenever a connection is available.
     const queueLocally = async (message: string) => {
@@ -66,9 +75,7 @@ export default function ReviewScreen() {
           status: "pending",
         });
 
-        Alert.alert("Saved offline", message, [
-          { text: "OK", onPress: () => router.replace("/home") },
-        ]);
+        doneSaving("Saved offline", message);
       } catch {
         Alert.alert(
           "Could not save",
@@ -87,12 +94,9 @@ export default function ReviewScreen() {
       );
 
       if (res.ok) {
-        Alert.alert(
+        doneSaving(
           editId ? "Updated" : "Saved",
-          editId
-            ? "Activity updated in your history."
-            : "Activity saved to your history.",
-          [{ text: "OK", onPress: () => router.replace("/home") }]
+          editId ? "Activity updated in your history." : "Activity saved to your history."
         );
         return;
       }

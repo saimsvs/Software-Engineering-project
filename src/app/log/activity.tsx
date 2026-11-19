@@ -24,10 +24,16 @@ const GRAY = "#666";
 const CATEGORIES = ["Transport", "Energy", "Food", "Waste"] as const;
 
 export default function ActivityScreen() {
-  const router = useRouter();const { editId, activity: activityId } = useLocalSearchParams<{
-  editId?: string;
-  activity?: string;
-}>();const incoming = activityId
+  const router = useRouter();
+  // When editing, Home passes the saved values; carry them on to the details
+  // screen so the existing note (and amount) aren't lost.
+  const { editId, activity: activityId, distance, unit, note } = useLocalSearchParams<{
+    editId?: string;
+    activity?: string;
+    distance?: string;
+    unit?: string;
+    note?: string;
+  }>();const incoming = activityId
   ? ACTIVITIES.find((a) => a.id === activityId)
   : undefined;
 
@@ -42,7 +48,18 @@ const [selected, setSelected] = useState<string | null>(incoming?.id ?? null);
       Alert.alert("Choose an activity", "Tap an activity card to select it.");
       return;
     }
-    router.push({ pathname: "/log/details", params: { activity: selected, ...(editId ? { editId } : {}) }});
+    const sameActivity = selected === activityId;
+    router.push({
+      pathname: "/log/details",
+      params: {
+        activity: selected,
+        ...(editId ? { editId } : {}),
+        ...(note ? { note } : {}),
+        // The amount only makes sense if the activity (and so its unit) is unchanged.
+        ...(sameActivity && distance ? { distance } : {}),
+        ...(sameActivity && unit ? { unit } : {}),
+      },
+    });
   };
 
   return (

@@ -1,3 +1,4 @@
+import { resetTo } from "@/utils/nav";
 import { clearToken } from "@/utils/storage";
 import { useRouter } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -10,7 +11,7 @@ export default function OrganizerScreen() {
 
   const handleLogout = async () => {
     await clearToken();
-    router.replace("/login");
+    resetTo(router, "/login");
   };
 
   return (

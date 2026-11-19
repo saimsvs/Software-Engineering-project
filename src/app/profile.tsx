@@ -1,9 +1,11 @@
 import { apiFetch } from "@/utils/api";
+import { resetTo } from "@/utils/nav";
 import { clearToken } from "@/utils/storage";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -64,16 +66,19 @@ export default function ProfileScreen() {
   }, []);
 
   const onLogout = () => {
+    const logOut = async () => {
+      await clearToken();
+      // Drop the app's screens from the history so "back" can't return to them.
+      resetTo(router, "/login");
+    };
+    // Alert.alert has no buttons on web, so use the browser's confirm there.
+    if (Platform.OS === "web") {
+      if (globalThis.confirm?.("Log out? You'll need to sign in again.")) logOut();
+      return;
+    }
     Alert.alert("Log out?", "You'll need to sign in again.", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Log Out",
-        style: "destructive",
-        onPress: async () => {
-          await clearToken();
-          router.replace("/login");
-        },
-      },
+      { text: "Log Out", style: "destructive", onPress: logOut },
     ]);
   };
 
