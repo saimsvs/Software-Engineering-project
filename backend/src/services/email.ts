@@ -131,22 +131,36 @@ export async function sendVerificationCode({
   to,
   name,
   code,
+  purpose = "verify",
 }: {
   to: string;
   name: string;
   code: string;
+  /** "verify" = finish signing up, "reset" = forgot password. Only the wording differs. */
+  purpose?: "verify" | "reset";
 }): Promise<void> {
-  const subject = `${env.appName} - Verify your email`;
+  const isReset = purpose === "reset";
+  const subject = isReset
+    ? `${env.appName} - Reset your password`
+    : `${env.appName} - Verify your email`;
+  const intro = isReset
+    ? `<h2>Reset your password</h2>
+      <p>Hi ${name},</p>
+      <p>We received a request to reset your ${env.appName} password. Enter this code in the app to choose a new one:</p>`
+    : `<h2>Welcome to ${env.appName}!</h2>
+      <p>Hi ${name},</p>
+      <p>Thank you for signing up. Please use the verification code below to verify your email address:</p>`;
+  const outro = isReset
+    ? `<p>If you didn't ask to reset your password, you can safely ignore this email. Your password won't change.</p>`
+    : `<p>If you didn't create an account, you can safely ignore this email.</p>`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2>Welcome to ${env.appName}!</h2>
-      <p>Hi ${name},</p>
-      <p>Thank you for signing up. Please use the verification code below to verify your email address:</p>
+      ${intro}
       <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 30px 0;">
         ${code}
       </div>
       <p>This code will expire in ${env.verificationCodeExpMin} minutes.</p>
-      <p>If you didn't create an account, you can safely ignore this email.</p>
+      ${outro}
       <p>Best regards,<br/>The ${env.appName} Team</p>
     </div>
   `;

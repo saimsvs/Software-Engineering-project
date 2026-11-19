@@ -26,8 +26,8 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  // Set by the verify-code screen after a successful verification.
-  const { verified } = useLocalSearchParams<{ verified?: string }>();
+  // Set by verify-code (after verifying) and forgot-password (after a reset).
+  const { verified, reset } = useLocalSearchParams<{ verified?: string; reset?: string }>();
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -91,10 +91,14 @@ export default function LoginScreen() {
       <Text style={styles.title}>Welcome Back</Text>
       <Text style={styles.subtitle}>Track your carbon footprint</Text>
 
-      {verified === "1" && !error && (
+      {(verified === "1" || reset === "1") && !error && (
         <View style={[styles.banner, styles.bannerSuccess]} accessibilityLiveRegion="polite">
           <Ionicons name="checkmark-circle" size={18} color={UI.green} />
-          <Text style={[styles.bannerText, { color: UI.greenDark }]}>Email verified. You can log in now.</Text>
+          <Text style={[styles.bannerText, { color: UI.greenDark }]}>
+            {reset === "1"
+              ? "Password updated. Log in with your new password."
+              : "Email verified. You can log in now."}
+          </Text>
         </View>
       )}
 
@@ -128,7 +132,15 @@ export default function LoginScreen() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity>
+      <TouchableOpacity
+        onPress={() =>
+          router.push({
+            pathname: "/forgot-password",
+            params: email.trim() ? { email: email.trim() } : {},
+          })
+        }
+        accessibilityRole="link"
+      >
         <Text style={styles.forgot}>Forgot Password?</Text>
       </TouchableOpacity>
 
