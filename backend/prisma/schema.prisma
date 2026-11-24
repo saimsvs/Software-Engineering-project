@@ -95,6 +95,8 @@ model Goal {
   name        String @db.VarChar(120)
   targetValue Float
   targetUnit  String @db.VarChar(32)
+  /// Which activity category counts toward the goal; null = every activity.
+  category    String? @db.VarChar(32)
   deadline    DateTime
   isPublic    Boolean @default(false)
   createdAt   DateTime @default(now())
