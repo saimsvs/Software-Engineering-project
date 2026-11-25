@@ -1,9 +1,11 @@
 import { apiFetch } from "@/utils/api";
+import { resetTo } from "@/utils/nav";
 import { clearToken } from "@/utils/storage";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,11 +14,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "@/components/screen-header";
+import type { IconName } from "@/data/activities";
+import { Ionicons } from "@expo/vector-icons";
+import { UI, cardShadow } from "@/constants/ui";
 
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
 const LIGHT_GREEN = "#E8F5E9";
-const BORDER = "#E0E0E0";
 const GRAY = "#666";
 const RED = "#D32F2F";
 
@@ -24,6 +28,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [name, setName] = useState("...");
   const [email, setEmail] = useState("...");
+  const [username, setUsername] = useState("");
   const [daysActive, setDaysActive] = useState(1);
   const [totalKg, setTotalKg] = useState(0);
   const [activityCount, setActivityCount] = useState(0);
@@ -39,6 +44,7 @@ export default function ProfileScreen() {
           const { user } = await meRes.json();
           setName(user.name);
           setEmail(user.email);
+          setUsername(user.username ?? "");
           const days = Math.max(
             1,
             Math.ceil((Date.now() - new Date(user.createdAt).getTime()) / 86400000)
@@ -60,16 +66,19 @@ export default function ProfileScreen() {
   }, []);
 
   const onLogout = () => {
+    const logOut = async () => {
+      await clearToken();
+      // Drop the app's screens from the history so "back" can't return to them.
+      resetTo(router, "/login");
+    };
+    // Alert.alert has no buttons on web, so use the browser's confirm there.
+    if (Platform.OS === "web") {
+      if (globalThis.confirm?.("Log out? You'll need to sign in again.")) logOut();
+      return;
+    }
     Alert.alert("Log out?", "You'll need to sign in again.", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Log Out",
-        style: "destructive",
-        onPress: async () => {
-          await clearToken();
-          router.replace("/login");
-        },
-      },
+      { text: "Log Out", style: "destructive", onPress: logOut },
     ]);
   };
 
@@ -81,7 +90,7 @@ export default function ProfileScreen() {
     danger,
     onPress,
   }: {
-    icon: string;
+    icon: IconName;
     label: string;
     value?: string;
     right?: React.ReactNode;
@@ -94,7 +103,7 @@ export default function ProfileScreen() {
       onPress={onPress}
       disabled={!onPress && !right}
     >
-      <Text style={styles.rowIcon}>{icon}</Text>
+      <Ionicons name={icon} size={18} color={danger ? RED : GRAY} style={styles.rowIcon} />
       <Text style={[styles.rowLabel, danger && { color: RED }]}>{label}</Text>
       {value ? (
         <View style={styles.rowBadge}>
@@ -112,14 +121,15 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.avatarWrap}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarIcon}>👤</Text>
+            <Ionicons name="person" size={40} color={GREEN} />
           </View>
           <View style={styles.cameraBadge}>
-            <Text style={styles.cameraIcon}>📷</Text>
+            <Ionicons name="camera-outline" size={14} color={DARK} />
           </View>
         </View>
 
         <Text style={styles.name}>{name}</Text>
+        {!!username && <Text style={styles.username}>@{username}</Text>}
         <Text style={styles.email}>{email}</Text>
 
         <View style={styles.statsRow}>
@@ -139,23 +149,29 @@ export default function ProfileScreen() {
 
         <Text style={styles.sectionTitle}>Settings</Text>
         <View style={styles.card}>
-          <Row icon="👤" label="Edit Profile" onPress={() => Alert.alert("Edit Profile", "Coming soon")} />
+          <Row icon="create-outline" label="Edit Profile" onPress={() => Alert.alert("Edit Profile", "Coming soon")} />
           <Row
-            icon="📏"
+            icon="resize-outline"
             label="Units (km / miles)"
             value="km"
             onPress={() => Alert.alert("Units", "Default: km")}
           />
         </View>
 
+        <Text style={styles.sectionTitle}>Sustainability & Community</Text>
+        <View style={styles.card}>
+          <Row icon="lock-closed-outline" label="Privacy & Location" onPress={() => router.push("/privacy")} />
+          <Row icon="flag-outline" label="My Goals" onPress={() => router.push("/goals")} />
+        </View>
+
         <Text style={styles.sectionTitle}>Account</Text>
         <View style={styles.card}>
           <Row
-            icon="📊"
+            icon="download-outline"
             label="Export Data"
             onPress={() => Alert.alert("Export", "Coming soon")}
           />
-          <Row icon="🚪" label="Log Out" danger onPress={onLogout} />
+          <Row icon="log-out-outline" label="Log Out" danger onPress={onLogout} />
         </View>
 
         <Text style={styles.version}>CarbonTrail v1.0.0</Text>
@@ -165,7 +181,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFF" },
+  safe: { flex: 1, backgroundColor: UI.bg },
 
   header: {
     flexDirection: "row",
@@ -194,7 +210,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarIcon: { fontSize: 44 },
   cameraBadge: {
     position: "absolute",
     right: -2,
@@ -202,44 +217,46 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#FFF",
-    borderWidth: 1,
-    borderColor: BORDER,
+    backgroundColor: UI.card,
     justifyContent: "center",
     alignItems: "center",
+    ...cardShadow,
   },
-  cameraIcon: { fontSize: 14 },
 
-  name: { fontSize: 22, fontWeight: "bold", color: DARK },
+  name: { fontSize: 24, fontWeight: "800", color: DARK, letterSpacing: -0.4 },
+  username: { fontSize: 14, fontWeight: "600", color: GREEN, marginTop: 2 },
   email: { fontSize: 14, color: GRAY, marginTop: 2, marginBottom: 18 },
 
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 24, alignSelf: "stretch" },
   statBox: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 12,
-    paddingVertical: 14,
+    backgroundColor: UI.card,
+    borderRadius: 16,
+    paddingVertical: 16,
     alignItems: "center",
+    ...cardShadow,
   },
-  statValue: { fontSize: 20, fontWeight: "bold", color: DARK },
+  statValue: { fontSize: 22, fontWeight: "800", color: DARK },
   statLabel: { fontSize: 11, color: GRAY, marginTop: 4, textAlign: "center" },
 
   sectionTitle: {
     alignSelf: "flex-start",
-    fontSize: 13,
+    fontSize: 12,
+    fontWeight: "600",
     color: GRAY,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
     marginBottom: 8,
     marginTop: 4,
+    marginLeft: 4,
   },
 
   card: {
     alignSelf: "stretch",
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 12,
+    backgroundColor: UI.card,
+    borderRadius: 16,
     marginBottom: 20,
-    overflow: "hidden",
+    ...cardShadow,
   },
   row: {
     flexDirection: "row",
@@ -247,9 +264,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER,
+    borderBottomColor: UI.hairline,
   },
-  rowIcon: { fontSize: 16, width: 28 },
+  rowIcon: { width: 28 },
   rowLabel: { flex: 1, fontSize: 15, color: DARK },
   rowBadge: {
     backgroundColor: LIGHT_GREEN,

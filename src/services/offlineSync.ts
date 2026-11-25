@@ -2,13 +2,39 @@ import { apiFetch } from "@/utils/api";
 import { dequeue, getQueue, updateOperation } from "@/utils/offlineQueue";
 import NetInfo from "@react-native-community/netinfo";
 
+// Only server rejections (4xx/5xx) count against this. Network failures are
+// retried forever, so a flaky connection can never silently abandon an entry.
 const MAX_RETRIES = 5;
 
-export async function syncQueue(): Promise<{
+export type SyncResult = {
   synced: number;
   failed: number;
   remaining: number;
-}> {
+};
+
+type SyncListener = (result: SyncResult) => void;
+
+const listeners = new Set<SyncListener>();
+
+/** Subscribe to sync completions (used to refresh the history list). */
+export function onSync(listener: SyncListener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function emit(result: SyncResult): void {
+  listeners.forEach((listener) => {
+    try {
+      listener(result);
+    } catch (error) {
+      console.error("Error in sync listener:", error);
+    }
+  });
+}
+
+export async function syncQueue(): Promise<SyncResult> {
   try {
     const netState = await NetInfo.fetch();
     if (!netState.isConnected || netState.isInternetReachable === false) {
@@ -28,7 +54,7 @@ export async function syncQueue(): Promise<{
     let failed = 0;
 
     for (const op of pendingOps) {
-      // Skip if exceeded max retries
+      // Skip if the server kept rejecting it
       if (op.retryCount >= MAX_RETRIES) {
         failed++;
         continue;
@@ -72,10 +98,10 @@ export async function syncQueue(): Promise<{
           failed++;
         }
       } catch (error) {
-        // Network error
+        // Network error — leave the retry count alone so this keeps trying
+        // on every reconnect instead of being dropped after 5 attempts.
         await updateOperation(op.id, {
           status: "failed",
-          retryCount: op.retryCount + 1,
           lastError: error instanceof Error ? error.message : "Network error",
         });
         failed++;
@@ -88,7 +114,9 @@ export async function syncQueue(): Promise<{
       (op) => op.status === "pending" || op.status === "failed"
     ).length;
 
-    return { synced, failed, remaining };
+    const result = { synced, failed, remaining };
+    if (synced > 0) emit(result);
+    return result;
   } catch (error) {
     console.error("Error syncing queue:", error);
     return { synced: 0, failed: 0, remaining: (await getQueue()).length };

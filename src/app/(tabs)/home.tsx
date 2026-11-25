@@ -1,10 +1,17 @@
 import { Logo } from "@/components/logo";
-import { ACTIVITIES } from "@/data/activities";
+import { ACTIVITIES, calcEmission, type IconName } from "@/data/activities";
+import { Ionicons } from "@expo/vector-icons";
+import { TAB_BAR_CLEARANCE, UI, cardShadow } from "@/constants/ui";
+import { onSync } from "@/services/offlineSync";
+import { PendingOperation } from "@/types/offline";
+import { cacheActivities, getCachedActivities } from "@/utils/activityCache";
 import { apiFetch } from "@/utils/api";
-import { useRouter } from "expo-router";
+import { dequeue, getQueue } from "@/utils/offlineQueue";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  AppState,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,21 +23,25 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
 const LIGHT_GREEN = "#E8F5E9";
-const BORDER = "#E0E0E0";
 const GRAY = "#666";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 type RecentItem = {
   id: string;
-  emoji: string;
+  icon: IconName;
   name: string;
   time: string;
   kg: string;
-  activityId: string;   // ← add
-  distance: number;     // ← add
-  unit: string;         // ← add
-  note: string | null;  // ← add
+  activityId: string;
+  distance: number;
+  unit: string;
+  note: string | null;
+  createdAtMs: number;
+  /** true while the entry is only on this phone and not yet on the server */
+  pending?: boolean;
+  /** true when the entry has never reached the server (offline create) */
+  local?: boolean;
 };
 
 type LogEntry = {
@@ -103,6 +114,40 @@ function formatTime(iso: string): string {
   return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })} • ${time}`;
 }
 
+function toRecent(entry: LogEntry, pending = false, local = false): RecentItem {
+  const meta = ACTIVITIES.find((x) => x.id === entry.activityId);
+  return {
+    id: entry.id,
+    icon: meta?.icon ?? "leaf-outline",
+    name: meta?.name ?? entry.activityId,
+    time: formatTime(entry.createdAt),
+    kg: `${entry.emission} kg`,
+    activityId: entry.activityId,
+    distance: entry.distance,
+    unit: entry.unit,
+    note: entry.note,
+    createdAtMs: new Date(entry.createdAt).getTime(),
+    pending,
+    local,
+  };
+}
+
+/** Turn a queued offline create into the same shape the server returns. */
+function pendingToEntry(op: PendingOperation): LogEntry | null {
+  if (!op.payload) return null;
+  const meta = ACTIVITIES.find((x) => x.id === op.payload!.activityId);
+  if (!meta) return null;
+  return {
+    id: op.id,
+    activityId: op.payload.activityId,
+    distance: op.payload.distance,
+    unit: op.payload.unit,
+    note: op.payload.note ?? null,
+    createdAt: new Date(op.createdAt).toISOString(),
+    emission: calcEmission(meta, String(op.payload.distance), op.payload.unit),
+  };
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const [recent, setRecent] = useState<RecentItem[]>([]);
@@ -111,47 +156,103 @@ export default function HomeScreen() {
   const [week, setWeek] = useState<Bar[]>(() => buildWeek([]));
 
   const loadData = useCallback(async () => {
+    let entries: LogEntry[] | null = null;
+
     try {
       const res = await apiFetch("/api/auth/activity?all=1");
-      if (!res.ok) return;
-      const data = await res.json();
-      if (!Array.isArray(data.activities)) return;
-      const entries: LogEntry[] = data.activities;
-
-      setRecent(
-        entries.slice(0, 10).map((a) => {
-          const meta = ACTIVITIES.find((x) => x.id === a.activityId);
-          return {
-            id: a.id,
-            emoji: meta?.emoji ?? "🌿",
-            name: meta?.name ?? a.activityId,
-            time: formatTime(a.createdAt),
-            kg: `${a.emission} kg`,
-            activityId: a.activityId,   // ← add
-      distance: a.distance,       // ← add
-      unit: a.unit,               // ← add
-      note: a.note, 
-          };
-        })
-      );
-
-      const now = new Date();
-      const yesterday = new Date(now);
-      yesterday.setDate(now.getDate() - 1);
-
-      setTodayKg(sumDay(entries, now));
-      setYesterdayKg(sumDay(entries, yesterday));
-      setWeek(buildWeek(entries));
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.activities)) {
+          entries = data.activities as LogEntry[];
+          // Keep a copy on the phone so history survives being offline.
+          cacheActivities(entries);
+        }
+      }
     } catch {
-      // keep current list on failure
+      // Offline — fall back to the cached copy below.
     }
+
+    if (!entries) {
+      entries = await getCachedActivities();
+    }
+
+    // Anything logged offline lives only in the queue until it syncs, so it
+    // has to be merged into the list here (otherwise it looks "lost").
+    const queue = await getQueue();
+    const pendingCreates = queue
+      .filter((op) => op.type === "create")
+      .map(pendingToEntry)
+      .filter((entry): entry is LogEntry => entry !== null);
+    const pendingUpdateIds = new Set(
+      queue
+        .filter((op) => op.type === "update" && op.serverId)
+        .map((op) => op.serverId as string)
+    );
+    const pendingDeleteIds = new Set(
+      queue
+        .filter((op) => op.type === "delete" && op.serverId)
+        .map((op) => op.serverId as string)
+    );
+
+    const combined = [
+      ...pendingCreates.map((entry) => toRecent(entry, true, true)),
+      ...entries
+        .filter((entry) => !pendingDeleteIds.has(entry.id))
+        .map((entry) => toRecent(entry, pendingUpdateIds.has(entry.id))),
+    ].sort((a, b) => b.createdAtMs - a.createdAtMs);
+
+    setRecent(combined.slice(0, 10));
+
+    // Offline entries count towards the totals straight away.
+    const allEntries = [...pendingCreates, ...entries];
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+
+    setTodayKg(sumDay(allEntries, now));
+    setYesterdayKg(sumDay(allEntries, yesterday));
+    setWeek(buildWeek(allEntries));
   }, []);
 
+  // Reload whenever the screen is shown (e.g. back from saving an activity).
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
+  // Refresh as soon as a background sync finishes.
+  useEffect(() => onSync(() => loadData()), [loadData]);
+
+  // And when the app comes back to the foreground (network may be back).
   useEffect(() => {
-    loadData();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") loadData();
+    });
+    return () => subscription.remove();
   }, [loadData]);
 
   const onDelete = (item: RecentItem) => {
+    // Offline-only entry: it lives in the queue, not on the server.
+    if (item.local) {
+      Alert.alert(
+        "Discard this activity?",
+        "It hasn't been uploaded yet, so it will be removed from this phone.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Discard",
+            style: "destructive",
+            onPress: async () => {
+              await dequeue(item.id);
+              await loadData();
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     Alert.alert("Delete activity?", `${item.name} • ${item.kg}`, [
       { text: "Cancel", style: "cancel" },
       {
@@ -163,7 +264,12 @@ export default function HomeScreen() {
               method: "DELETE",
             });
             if (res.ok) {
-              setRecent((prev) => prev.filter((x) => x.id !== item.id));
+              // Drop any queued edits for this entry as well.
+              const queue = await getQueue();
+              for (const op of queue.filter((o) => o.serverId === item.id)) {
+                await dequeue(op.id);
+              }
+              await loadData();
             } else {
               Alert.alert("Error", "Could not delete");
             }
@@ -176,6 +282,14 @@ export default function HomeScreen() {
   };
 
 const onEdit=(item: RecentItem)=>{
+  if (item.local) {
+    Alert.alert(
+      "Not synced yet",
+      "This activity is still on your phone. You can edit it once it has been uploaded."
+    );
+    return;
+  }
+
   router.push({
     pathname: "/log/activity",
     params: {
@@ -205,12 +319,12 @@ const onEdit=(item: RecentItem)=>{
             activeOpacity={0.7}
             onPress={() => router.push("/profile")}
           >
-            <Text style={styles.avatarIcon}>👤</Text>
+            <Ionicons name="person-outline" size={18} color={DARK} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.hero}>
-          <Text style={styles.heroLabel}>Today's Footprint</Text>
+          <Text style={styles.heroLabel}>{"Today's Footprint"}</Text>
           <View style={styles.heroValueRow}>
             <Text style={styles.heroValue}>{todayKg.toFixed(1)}</Text>
             <Text style={styles.heroUnit}>kg CO₂e</Text>
@@ -231,7 +345,8 @@ const onEdit=(item: RecentItem)=>{
           activeOpacity={0.85}
           onPress={() => router.push("/log/activity")}
         >
-          <Text style={styles.ctaText}>+   Log Activity</Text>
+          <Ionicons name="add-circle-outline" size={20} color="#FFF" />
+          <Text style={styles.ctaText}>Log Activity</Text>
         </TouchableOpacity>
 
         <View style={styles.sectionRow}>
@@ -273,11 +388,22 @@ const onEdit=(item: RecentItem)=>{
   >
           <View key={a.id} style={styles.activityInner}>
             <View style={styles.emojiCircle}>
-              <Text style={styles.emoji}>{a.emoji}</Text>
+              <Ionicons name={a.icon} size={18} color={GREEN} />
             </View>
             <View style={styles.activityInfo}>
               <Text style={styles.activityName}>{a.name}</Text>
               <Text style={styles.activityTime}>{a.time}</Text>
+              {!!a.note && (
+                <View style={styles.noteRow}>
+                  <Ionicons name="document-text-outline" size={12} color={GRAY} />
+                  <Text style={styles.noteText} numberOfLines={2}>
+                    {a.note}
+                  </Text>
+                </View>
+              )}
+              {a.pending && (
+                <Text style={styles.pendingBadge}>● Pending sync</Text>
+              )}
             </View>
             <Text style={styles.activityKg}>{a.kg}</Text>
             
@@ -286,7 +412,7 @@ const onEdit=(item: RecentItem)=>{
               onPress={() => onDelete(a)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.deleteIcon}>✕</Text>
+              <Ionicons name="close" size={16} color="#999" />
             </TouchableOpacity>
           </View>
           </TouchableOpacity>
@@ -297,8 +423,8 @@ const onEdit=(item: RecentItem)=>{
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFF" },
-  content: { paddingHorizontal: 20, paddingBottom: 110 },
+  safe: { flex: 1, backgroundColor: UI.bg },
+  content: { paddingHorizontal: 20, paddingBottom: TAB_BAR_CLEARANCE },
 
   greetingRow: {
     flexDirection: "row",
@@ -315,22 +441,22 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: LIGHT_GREEN,
+    backgroundColor: UI.card,
     justifyContent: "center",
     alignItems: "center",
+    ...cardShadow,
   },
-  avatarIcon: { fontSize: 18 },
 
   hero: {
-    backgroundColor: LIGHT_GREEN,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    backgroundColor: UI.greenDark,
+    borderRadius: 22,
+    padding: 22,
+    marginBottom: 14,
   },
-  heroLabel: { fontSize: 13, fontWeight: "600", color: GREEN },
+  heroLabel: { fontSize: 13, fontWeight: "600", color: "rgba(255,255,255,0.75)", letterSpacing: 0.3 },
   heroValueRow: { flexDirection: "row", alignItems: "baseline", marginTop: 6 },
-  heroValue: { fontSize: 40, fontWeight: "bold", color: DARK },
-  heroUnit: { fontSize: 16, color: GRAY, marginLeft: 8 },
+  heroValue: { fontSize: 44, fontWeight: "800", color: "#FFF", letterSpacing: -1 },
+  heroUnit: { fontSize: 16, color: "rgba(255,255,255,0.75)", marginLeft: 8 },
   pill: {
     alignSelf: "flex-start",
     backgroundColor: "#FFF",
@@ -343,11 +469,14 @@ const styles = StyleSheet.create({
 
   cta: {
     backgroundColor: GREEN,
-    borderRadius: 10,
-    height: 52,
+    borderRadius: 16,
+    height: 54,
+    flexDirection: "row",
+    gap: 8,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 28,
+    ...cardShadow,
   },
   ctaText: { color: "#FFF", fontSize: 16, fontWeight: "600" },
 
@@ -357,15 +486,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "bold", color: DARK, marginBottom: 12 },
+  sectionTitle: { fontSize: 17, fontWeight: "700", color: DARK, marginBottom: 12, letterSpacing: -0.2 },
   link: { fontSize: 13, color: GREEN, fontWeight: "600" },
 
   chartCard: {
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 10,
+    backgroundColor: UI.card,
+    borderRadius: UI.radius,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 28,
+    ...cardShadow,
   },
   barsRow: {
     flexDirection: "row",
@@ -382,17 +511,11 @@ const styles = StyleSheet.create({
   activityRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#EFEFEF",
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    backgroundColor: UI.card,
+    ...cardShadow,
   },
   activityInner: {
     flex: 1,
@@ -407,20 +530,32 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  emoji: { fontSize: 16 },
   activityInfo: { flex: 1, marginLeft: 12 },
   activityName: { fontSize: 15, fontWeight: "600", color: DARK },
   activityTime: { fontSize: 12, color: GRAY, marginTop: 2 },
+  noteRow: { flexDirection: "row", alignItems: "flex-start", gap: 4, marginTop: 4 },
+  noteText: { flex: 1, fontSize: 12.5, color: "#4B5563", fontStyle: "italic" },
+  pendingBadge: {
+    alignSelf: "flex-start",
+    marginTop: 4,
+    backgroundColor: "#FFF4E5",
+    color: "#B26A00",
+    fontSize: 10,
+    fontWeight: "700",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    overflow: "hidden",
+  },
   activityKg: { fontSize: 14, fontWeight: "bold", color: GREEN },
   deleteBtn: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#F3F4F3",
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 8,
   },
-  deleteIcon: { fontSize: 12, color: "#999" },
   emptyText: { fontSize: 14, color: GRAY, textAlign: "center", marginVertical: 16 },
 });

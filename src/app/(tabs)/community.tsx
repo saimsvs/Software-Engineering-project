@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { TAB_BAR_CLEARANCE, UI, cardShadow } from "@/constants/ui";
 import { apiFetch } from "@/utils/api";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -25,6 +26,7 @@ type Relationship = "none" | "connected" | "request_sent" | "request_received";
 type Person = {
   id: string;
   name: string;
+  username: string;
   relationship: Relationship;
   connectionId?: string;
 };
@@ -32,13 +34,13 @@ type Person = {
 type ConnectionItem = {
   id: string;
   connectedAt: string | null;
-  user: { id: string; name: string };
+  user: { id: string; name: string; username: string };
 };
 
 type RequestItem = {
   id: string;
   createdAt: string;
-  user: { id: string; name: string };
+  user: { id: string; name: string; username: string };
 };
 
 function initials(name: string): string {
@@ -244,7 +246,7 @@ export default function CommunityScreen() {
           <Ionicons name="search" size={18} color={GRAY} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by name or email"
+            placeholder="Search by name, username or email"
             placeholderTextColor="#9E9E9E"
             value={query}
             onChangeText={setQuery}
@@ -277,6 +279,9 @@ export default function CommunityScreen() {
                 </View>
                 <View style={styles.personInfo}>
                   <Text style={styles.personName}>{item.user.name}</Text>
+                  {!!item.user.username && (
+                    <Text style={styles.personUsername}>@{item.user.username}</Text>
+                  )}
                   <Text style={styles.personMeta}>Wants to connect</Text>
                 </View>
                 <TouchableOpacity
@@ -310,6 +315,9 @@ export default function CommunityScreen() {
                 </View>
                 <View style={styles.personInfo}>
                   <Text style={styles.personName}>{item.user.name}</Text>
+                  {!!item.user.username && (
+                    <Text style={styles.personUsername}>@{item.user.username}</Text>
+                  )}
                   <Text style={styles.personMeta}>Connected</Text>
                 </View>
                 <TouchableOpacity
@@ -343,6 +351,9 @@ export default function CommunityScreen() {
             </View>
             <View style={styles.personInfo}>
               <Text style={styles.personName}>{person.name}</Text>
+              {!!person.username && (
+                <Text style={styles.personUsername}>@{person.username}</Text>
+              )}
               <Text style={styles.personMeta}>
                 {person.relationship === "connected"
                   ? "Connected"
@@ -362,49 +373,49 @@ export default function CommunityScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFF" },
-  content: { paddingHorizontal: 20, paddingBottom: 110 },
+  safe: { flex: 1, backgroundColor: UI.bg },
+  content: { paddingHorizontal: 20, paddingBottom: TAB_BAR_CLEARANCE },
 
-  title: { fontSize: 28, fontWeight: "bold", color: DARK, marginTop: 8 },
+  title: { fontSize: 30, fontWeight: "800", color: DARK, marginTop: 8, letterSpacing: -0.5 },
   subtitle: { fontSize: 14, color: GRAY, marginTop: 4, marginBottom: 16 },
 
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 46,
+    backgroundColor: UI.card,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 48,
     marginBottom: 8,
+    ...cardShadow,
   },
   searchInput: { flex: 1, fontSize: 15, color: DARK },
 
   loading: { paddingVertical: 20 },
 
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: 17,
+    fontWeight: "700",
     color: DARK,
-    marginTop: 18,
+    letterSpacing: -0.2,
+    marginTop: 20,
     marginBottom: 10,
   },
 
   card: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#EFEFEF",
     borderRadius: 16,
-    padding: 12,
+    padding: 14,
     marginBottom: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: UI.card,
+    ...cardShadow,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: LIGHT_GREEN,
     justifyContent: "center",
     alignItems: "center",
@@ -412,6 +423,7 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 16, fontWeight: "700", color: GREEN },
   personInfo: { flex: 1, marginLeft: 12 },
   personName: { fontSize: 15, fontWeight: "600", color: DARK },
+  personUsername: { fontSize: 13, color: GREEN, marginTop: 1 },
   personMeta: { fontSize: 12, color: GRAY, marginTop: 2 },
 
   primaryBtn: {

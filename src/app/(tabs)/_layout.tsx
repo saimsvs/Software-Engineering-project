@@ -3,9 +3,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs, TabList, TabSlot, TabTrigger } from "expo-router/ui";
 import { useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const GREEN = "#2E7D32";
+import { UI } from "@/constants/ui";
+
 const GRAY = "#8A8A8E";
 
 type TabButtonProps = {
@@ -19,25 +19,29 @@ type TabButtonProps = {
 
 function TabButton({ icon, iconActive, label, isFocused, onPress, ref }: TabButtonProps) {
   return (
-    <Pressable ref={ref} onPress={onPress} style={styles.tabItem} hitSlop={4}>
-      <Ionicons
-        name={isFocused ? iconActive : icon}
-        size={22}
-        color={isFocused ? GREEN : GRAY}
-      />
-      <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>{label}</Text>
+    <Pressable
+      ref={ref}
+      onPress={onPress}
+      hitSlop={6}
+      accessibilityRole="tab"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: !!isFocused }}
+      style={[styles.tabItem, isFocused && styles.tabItemActive]}
+    >
+      <Ionicons name={isFocused ? iconActive : icon} size={20} color={isFocused ? UI.green : GRAY} />
+      {isFocused && <Text style={styles.tabLabel}>{label}</Text>}
     </Pressable>
   );
 }
 
 /**
- * Apple-style floating tab bar: a compact frosted-glass pill with Home / Map
- * only. On Android, expo-blur needs the content wrapped in BlurTargetView and
+ * Compact floating tab bar: a small frosted-glass pill centred at the bottom.
+ * The active tab expands into a soft green capsule with its label; the others
+ * show just their icon. On Android, expo-blur needs the content wrapped in BlurTargetView and
  * passed via blurTarget + blurMethod="dimezisBlurView" — otherwise it falls
  * back to a dimmed (dark) non-blurred overlay.
  */
 export default function TabLayout() {
-  const insets = useSafeAreaInsets();
   const tabContentRef = useRef<View>(null);
 
   return (
@@ -46,7 +50,7 @@ export default function TabLayout() {
         <TabSlot />
       </BlurTargetView>
 
-      <TabList style={[styles.pill, { bottom: Math.max(insets.bottom, 10) + 8 }]}>
+      <TabList style={[styles.pill, { bottom: 10 }]}>
         <BlurView
           blurTarget={tabContentRef}
           blurMethod="dimezisBlurView"
@@ -74,42 +78,41 @@ const styles = StyleSheet.create({
   },
   pill: {
     position: "absolute",
-    left: 24,
-    right: 24,
+    alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    // Translucent white base — together with the real blur above it this
-    // reads as frosted glass on BOTH platforms (iOS gets native vibrancy)
-    backgroundColor: "rgba(255,255,255,0.72)",
-    borderRadius: 22,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    gap: 4,
+    padding: 5,
+    borderRadius: 999,
+    // Translucent white base — with the real blur behind it this reads as
+    // frosted glass on both platforms.
+    backgroundColor: "rgba(255,255,255,0.82)",
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(0,0,0,0.08)",
     overflow: "hidden",
-    // iOS shadow
     shadowColor: "#000000",
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
-    // Android shadow
-    elevation: 8,
+    elevation: 10,
   },
   tabItem: {
-    flex: 1,
+    height: 42,
+    minWidth: 48,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 4,
-    gap: 2,
+    gap: 6,
+  },
+  tabItemActive: {
+    backgroundColor: UI.greenSoft,
+    paddingHorizontal: 16,
   },
   tabLabel: {
-    fontSize: 10,
-    fontWeight: "500",
-    color: GRAY,
-  },
-  tabLabelActive: {
-    color: GREEN,
-    fontWeight: "700",
+    fontSize: 13,
+    fontWeight: "600",
+    color: UI.green,
   },
 });

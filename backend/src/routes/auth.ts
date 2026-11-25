@@ -7,13 +7,59 @@ import { env } from "../config/env.js";
 import { requireAuth } from "../middleware/auth.js";
 import { compareCodes, generateVerificationCode, hashCode } from "../utils/crypto.js";
 import { sendVerificationCode } from "../services/email.js";
+import { generateUniqueUsername } from "../utils/username.js";
 const router = Router();
 
+// Replace any old codes for this user with a fresh one and email it.
+// The same 6-digit codes serve sign-up verification and password resets: both
+// prove the person can read this inbox. `purpose` only changes the email text.
+async function issueVerificationCode(
+  user: { id: string; email: string; name: string },
+  purpose: "verify" | "reset" = "verify"
+) {
+  await prisma.emailVerificationCode.deleteMany({ where: { userId: user.id } });
+
+  const code = generateVerificationCode();
+  await prisma.emailVerificationCode.create({
+    data: {
+      codeHash: hashCode(code),
+      userId: user.id,
+      expiresAt: new Date(Date.now() + env.verificationCodeExpMin * 60 * 1000),
+    },
+  });
+
+  try {
+    await sendVerificationCode({ to: user.email, name: user.name, code, purpose });
+  } catch (error) {
+    console.error("Error sending verification email:", error);
+  }
+}
+
 const registerSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
-  password: z.string().min(8),
+  name: z
+    .string({ error: "Please enter your name" })
+    .trim()
+    .min(1, "Please enter your name")
+    .max(60, "Name must be 60 characters or fewer"),
+  email: z
+    .string({ error: "Please enter your email" })
+    .trim()
+    .email("Enter a valid email address, like name@example.com"),
+  password: z
+    .string({ error: "Please enter a password" })
+    .min(8, "Password must be at least 8 characters")
+    .max(72, "Password must be 72 characters or fewer"),
 });
+
+/** First error per field, e.g. { email: "Enter a valid email address" }. */
+function fieldErrorsOf(error: z.ZodError): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const field = String(issue.path[0] ?? "form");
+    if (!out[field]) out[field] = issue.message;
+  }
+  return out;
+}
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -33,23 +79,43 @@ const resendCodeSchema = z.object({
 router.post("/register", async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res
-      .status(400)
-      .json({ message: "Invalid input", errors: parsed.error.flatten() });
+    const fieldErrors = fieldErrorsOf(parsed.error);
+    return res.status(400).json({
+      message: Object.values(fieldErrors)[0] ?? "Please check the form and try again",
+      fieldErrors,
+    });
   }
 
   const { name, email, password } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return res.status(400).json({ message: "Email already registered" });
+  if (existing?.emailVerified) {
+    return res.status(409).json({
+      message: "An account with this email already exists. Try logging in instead.",
+      fieldErrors: { email: "An account with this email already exists" },
+    });
   }
 
+  // An unverified account means someone started signing up but never entered
+  // the code. Let them register again: take the new name/password and send a
+  // fresh code instead of locking the email out.
   const passwordHash = await bcrypt.hash(password, 12);
-  const user = await prisma.user.create({
-    data: { name, email, passwordHash, emailVerified: false },
-    select: { id: true, name: true, email: true, createdAt: true },
-  });
+  const user = existing
+    ? await prisma.user.update({
+        where: { id: existing.id },
+        data: { name, passwordHash },
+        select: { id: true, name: true, email: true, createdAt: true },
+      })
+    : await prisma.user.create({
+        data: {
+          name,
+          username: await generateUniqueUsername(name),
+          email,
+          passwordHash,
+          emailVerified: false,
+        },
+        select: { id: true, name: true, email: true, createdAt: true },
+      });
 
   // Delete any existing verification codes for this user
   await prisma.emailVerificationCode.deleteMany({
@@ -197,6 +263,113 @@ router.post("/resend-code", async (req, res) => {
   res.json({ message: "If an account exists, a verification code has been sent" });
 });
 
+// ---------------------------------------------------------------------------
+// Forgot password: email a 6-digit code, then set a new password with it.
+// ---------------------------------------------------------------------------
+const forgotPasswordSchema = z.object({
+  email: z
+    .string({ error: "Please enter your email" })
+    .trim()
+    .email("Enter a valid email address, like name@example.com"),
+});
+
+const resetPasswordSchema = z.object({
+  email: z
+    .string({ error: "Please enter your email" })
+    .trim()
+    .email("Enter a valid email address, like name@example.com"),
+  code: z
+    .string({ error: "Enter the 6-digit code from your email" })
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code from your email"),
+  password: z
+    .string({ error: "Please enter a new password" })
+    .min(8, "Password must be at least 8 characters")
+    .max(72, "Password must be 72 characters or fewer"),
+});
+
+const RESET_SENT_MESSAGE = "If an account exists for this email, we've sent it a 6-digit code.";
+const RESEND_COOLDOWN_MS = 60 * 1000;
+
+// POST /api/auth/forgot-password
+router.post("/forgot-password", async (req, res) => {
+  const parsed = forgotPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const fieldErrors = fieldErrorsOf(parsed.error);
+    return res.status(400).json({ message: Object.values(fieldErrors)[0], fieldErrors });
+  }
+
+  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  if (user) {
+    // Don't send a new email more than once a minute (stops inbox spamming).
+    const latest = await prisma.emailVerificationCode.findFirst({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!latest || Date.now() - latest.createdAt.getTime() >= RESEND_COOLDOWN_MS) {
+      await issueVerificationCode(user, "reset");
+    }
+  }
+
+  // Same reply whether or not the account exists, so this can't be used to
+  // find out which emails are registered.
+  res.json({ message: RESET_SENT_MESSAGE });
+});
+
+// POST /api/auth/reset-password
+router.post("/reset-password", async (req, res) => {
+  const parsed = resetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const fieldErrors = fieldErrorsOf(parsed.error);
+    return res.status(400).json({ message: Object.values(fieldErrors)[0], fieldErrors });
+  }
+
+  const { email, code, password } = parsed.data;
+  const codeError = (message: string) =>
+    res.status(400).json({ message, fieldErrors: { code: message } });
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    return codeError("That code is invalid or has expired. Request a new one.");
+  }
+
+  const resetCode = await prisma.emailVerificationCode.findFirst({
+    where: { userId: user.id },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!resetCode) {
+    return codeError("That code is invalid or has expired. Request a new one.");
+  }
+
+  if (resetCode.expiresAt < new Date()) {
+    await prisma.emailVerificationCode.delete({ where: { id: resetCode.id } });
+    return codeError("This code has expired. Request a new one.");
+  }
+
+  if (resetCode.attempts >= 5) {
+    await prisma.emailVerificationCode.deleteMany({ where: { userId: user.id } });
+    return codeError("Too many wrong attempts. Request a new code.");
+  }
+
+  if (!compareCodes(code, resetCode.codeHash)) {
+    await prisma.emailVerificationCode.update({
+      where: { id: resetCode.id },
+      data: { attempts: resetCode.attempts + 1 },
+    });
+    return codeError("That code isn't right. Check your email and try again.");
+  }
+
+  // Code is good: set the new password. Reading the code also proves they own
+  // the inbox, so an account that never finished verifying is verified now.
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await bcrypt.hash(password, 12), emailVerified: true },
+  });
+  await prisma.emailVerificationCode.deleteMany({ where: { userId: user.id } });
+
+  res.json({ message: "Password updated. You can log in with your new password." });
+});
+
 // POST /api/auth/login
 router.post("/login", async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
@@ -243,12 +416,23 @@ router.post("/login", async (req, res) => {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
+  // Sign-up was never finished: send a fresh code and make the app show the
+  // verification screen instead of logging in.
+  if (!user.emailVerified) {
+    await issueVerificationCode(user);
+    return res.status(403).json({
+      message: "Please verify your email. We've sent you a new code.",
+      code: "EMAIL_NOT_VERIFIED",
+      email: user.email,
+    });
+  }
+
   const token = jwt.sign({ userId: user.id, role: "user" }, env.jwtSecret, {
     expiresIn: env.jwtExpiresIn,
   });
 
   res.json({
-    user: { id: user.id, name: user.name, email: user.email, role: "user" },
+    user: { id: user.id, name: user.name, username: user.username, email: user.email, role: "user" },
     token,
   });
 });
@@ -256,7 +440,7 @@ router.post("/login", async (req, res) => {
 router.get("/me", requireAuth, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.userId },
-    select: { id: true, name: true, email: true, emailVerified: true, createdAt: true },
+    select: { id: true, name: true, username: true, email: true, emailVerified: true, createdAt: true },
   });
   if (!user) return res.status(404).json({ message: "User not found" });
   res.json({ user });

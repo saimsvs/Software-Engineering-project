@@ -13,13 +13,14 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { UI, cardShadow } from "@/constants/ui";
 import { ScreenHeader } from "@/components/screen-header";
-import { v4 as uuidv4 } from "uuid";
+import { newId } from "@/utils/id";
 
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
 const LIGHT_GREEN = "#E8F5E9";
-const BORDER = "#E0E0E0";
 const GRAY = "#666";
 
 export default function ReviewScreen() {
@@ -49,31 +50,21 @@ export default function ReviewScreen() {
       note: note || undefined,
     };
 
-    try {
-      const res = await apiFetch(
-        editId ? `/api/auth/activity/${editId}` : "/api/auth/activity",
-        {
-          method: editId ? "PATCH" : "POST",
-          body: JSON.stringify(payload),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        Alert.alert("Error", data.message || "Could not save activity");
-        return;
-      }
-      Alert.alert(
-        editId ? "Updated" : "Saved",
-        editId
-          ? "Activity updated in your history."
-          : "Activity saved to your history.",
-        [{ text: "OK", onPress: () => router.replace("/home") }]
-      );
-    } catch {
-      // Network error - save to offline queue
+    // Go back to the Home screen that's already underneath the 3 logging steps
+    // (rather than stacking a new Home on top of them, which made "back" from
+    // Home reopen the logging screens), then confirm. Navigating first also
+    // means a missing pop-up (e.g. on web) can't leave the user stuck here.
+    const doneSaving = (title: string, message: string) => {
+      router.dismissTo("/home");
+      Alert.alert(title, message);
+    };
+
+    // Store the entry on this phone first, then let the sync service upload it
+    // whenever a connection is available.
+    const queueLocally = async (message: string) => {
       try {
         await enqueue({
-          id: uuidv4(),
+          id: newId(),
           type: editId ? "update" : "create",
           endpoint: editId ? `/api/auth/activity/${editId}` : "/api/auth/activity",
           method: editId ? "PATCH" : "POST",
@@ -84,16 +75,50 @@ export default function ReviewScreen() {
           status: "pending",
         });
 
+        doneSaving("Saved offline", message);
+      } catch {
         Alert.alert(
-          "Saved Offline",
-          editId
-            ? "Update saved locally. It will sync automatically when you're back online."
-            : "Activity saved locally. It will sync automatically when you're back online.",
-          [{ text: "OK", onPress: () => router.replace("/home") }]
+          "Could not save",
+          "This activity could not be stored on your phone. Please try again."
         );
-      } catch (queueError) {
-        Alert.alert("Error", "Failed to save activity offline");
       }
+    };
+
+    try {
+      const res = await apiFetch(
+        editId ? `/api/auth/activity/${editId}` : "/api/auth/activity",
+        {
+          method: editId ? "PATCH" : "POST",
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (res.ok) {
+        doneSaving(
+          editId ? "Updated" : "Saved",
+          editId ? "Activity updated in your history." : "Activity saved to your history."
+        );
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+
+      // Server is down (5xx) — keep the entry instead of throwing it away.
+      if (res.status >= 500) {
+        await queueLocally(
+          "The server is unavailable right now. Your activity is saved on this phone and will sync automatically."
+        );
+        return;
+      }
+
+      Alert.alert("Error", data.message || "Could not save activity");
+    } catch {
+      // Network error - save to offline queue
+      await queueLocally(
+        editId
+          ? "Update saved locally. It will sync automatically when you're back online."
+          : "Activity saved locally. It will sync automatically when you're back online."
+      );
     } finally {
       setSaving(false);
     }
@@ -109,7 +134,7 @@ export default function ReviewScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.emojiCircle}>
-              <Text style={styles.emoji}>{activity.emoji}</Text>
+              <Ionicons name={activity.icon} size={20} color={GREEN} />
             </View>
             <Text style={styles.activityName}>{activity.name}</Text>
             <View style={styles.badge}>
@@ -145,7 +170,7 @@ export default function ReviewScreen() {
           disabled={saving}
         >
           <Text style={styles.saveText}>
-            {saving ? "Saving…" : editId ? "✓ Save Changes" : "✓ Save Activity"}
+            {saving ? "Saving…" : editId ? "Save Changes" : "Save Activity"}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -161,7 +186,7 @@ export default function ReviewScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFF" },
+  safe: { flex: 1, backgroundColor: UI.bg },
 
   header: {
     flexDirection: "row",
@@ -182,10 +207,10 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingBottom: 24 },
 
   card: {
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: UI.card,
+    borderRadius: 16,
+    padding: 18,
+    ...cardShadow,
   },
   cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
   emojiCircle: {
@@ -197,7 +222,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 10,
   },
-  emoji: { fontSize: 20 },
   activityName: { flex: 1, fontSize: 16, fontWeight: "bold", color: DARK },
   badge: {
     backgroundColor: LIGHT_GREEN,
@@ -210,7 +234,7 @@ const styles = StyleSheet.create({
 
   row: { fontSize: 15, color: DARK, marginBottom: 12 },
 
-  emissionBox: { backgroundColor: LIGHT_GREEN, borderRadius: 10, padding: 14 },
+  emissionBox: { backgroundColor: LIGHT_GREEN, borderRadius: 14, padding: 14 },
   emissionLabel: { fontSize: 11, fontWeight: "700", color: GREEN, letterSpacing: 0.5 },
   emissionValue: { fontSize: 28, fontWeight: "bold", color: DARK, marginTop: 4 },
   emissionMeta: { fontSize: 12, color: GRAY, marginTop: 4 },
@@ -219,7 +243,7 @@ const styles = StyleSheet.create({
 
   infoBox: {
     backgroundColor: "#EEF4FF",
-    borderRadius: 10,
+    borderRadius: 14,
     padding: 14,
     marginTop: 16,
   },
@@ -228,7 +252,7 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 4 },
   saveBtn: {
     backgroundColor: GREEN,
-    borderRadius: 10,
+    borderRadius: 14,
     height: 52,
     justifyContent: "center",
     alignItems: "center",
@@ -238,7 +262,7 @@ const styles = StyleSheet.create({
   editBtn: {
     borderWidth: 1.5,
     borderColor: DARK,
-    borderRadius: 10,
+    borderRadius: 14,
     height: 52,
     justifyContent: "center",
     alignItems: "center",

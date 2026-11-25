@@ -1,3 +1,4 @@
+import { Logo } from "@/components/logo";
 import { apiFetch } from "@/utils/api";
 import { getToken, clearToken } from "@/utils/storage";
 import { Redirect } from "expo-router";
@@ -33,7 +34,7 @@ export default function Index() {
   if (state === "checking") {
     return (
       <View style={styles.splash}>
-        <Text style={styles.logo}>🍃</Text>
+        <Logo size={72} />
         <Text style={styles.title}>CarbonTrail</Text>
         <ActivityIndicator color="#2E7D32" style={{ marginTop: 16 }} />
       </View>
@@ -46,10 +47,9 @@ export default function Index() {
 const styles = StyleSheet.create({
   splash: {
     flex: 1,
-    backgroundColor: "#FFF",
+    backgroundColor: "#F5F7F5",
     justifyContent: "center",
     alignItems: "center",
   },
-  logo: { fontSize: 56 },
   title: { fontSize: 22, fontWeight: "bold", color: "#2E7D32", marginTop: 8 },
 });

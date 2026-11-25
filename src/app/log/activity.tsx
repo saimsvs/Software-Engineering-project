@@ -11,22 +11,29 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { UI, cardShadow } from "@/constants/ui";
 import { ScreenHeader } from "@/components/screen-header";
 
 
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
 const LIGHT_GREEN = "#E8F5E9";
-const BORDER = "#E0E0E0";
 const GRAY = "#666";
 
 const CATEGORIES = ["Transport", "Energy", "Food", "Waste"] as const;
 
 export default function ActivityScreen() {
-  const router = useRouter();const { editId, activity: activityId } = useLocalSearchParams<{
-  editId?: string;
-  activity?: string;
-}>();const incoming = activityId
+  const router = useRouter();
+  // When editing, Home passes the saved values; carry them on to the details
+  // screen so the existing note (and amount) aren't lost.
+  const { editId, activity: activityId, distance, unit, note } = useLocalSearchParams<{
+    editId?: string;
+    activity?: string;
+    distance?: string;
+    unit?: string;
+    note?: string;
+  }>();const incoming = activityId
   ? ACTIVITIES.find((a) => a.id === activityId)
   : undefined;
 
@@ -41,7 +48,18 @@ const [selected, setSelected] = useState<string | null>(incoming?.id ?? null);
       Alert.alert("Choose an activity", "Tap an activity card to select it.");
       return;
     }
-    router.push({ pathname: "/log/details", params: { activity: selected, ...(editId ? { editId } : {}) }});
+    const sameActivity = selected === activityId;
+    router.push({
+      pathname: "/log/details",
+      params: {
+        activity: selected,
+        ...(editId ? { editId } : {}),
+        ...(note ? { note } : {}),
+        // The amount only makes sense if the activity (and so its unit) is unchanged.
+        ...(sameActivity && distance ? { distance } : {}),
+        ...(sameActivity && unit ? { unit } : {}),
+      },
+    });
   };
 
   return (
@@ -81,8 +99,10 @@ const [selected, setSelected] = useState<string | null>(incoming?.id ?? null);
                   activeOpacity={0.8}
                   onPress={() => setSelected(a.id)}
                 >
-                  {isSelected && <Text style={styles.check}>✓</Text>}
-                  <Text style={styles.cardEmoji}>{a.emoji}</Text>
+                  {isSelected && (
+                    <Ionicons name="checkmark-circle" size={18} color={GREEN} style={styles.check} />
+                  )}
+                  <Ionicons name={a.icon} size={32} color={GREEN} style={styles.cardIcon} />
                   <Text style={styles.cardName}>{a.name}</Text>
                   <Text style={styles.cardUnit}>{a.unit}</Text>
                 </TouchableOpacity>
@@ -102,7 +122,7 @@ const [selected, setSelected] = useState<string | null>(incoming?.id ?? null);
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFF" },
+  safe: { flex: 1, backgroundColor: UI.bg },
 
   header: {
     flexDirection: "row",
@@ -126,11 +146,12 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: "transparent",
     borderRadius: 999,
     paddingVertical: 8,
     alignItems: "center",
-    backgroundColor: "#FFF",
+    backgroundColor: UI.card,
+    ...cardShadow,
   },
   tabActive: { backgroundColor: GREEN, borderColor: GREEN },
   tabText: { fontSize: 13, color: DARK, fontWeight: "500" },
@@ -147,29 +168,27 @@ const styles = StyleSheet.create({
   card: {
     width: "48%",
     borderWidth: 1.5,
-    borderColor: BORDER,
-    borderRadius: 12,
-    paddingVertical: 18,
+    borderColor: "transparent",
+    borderRadius: 16,
+    paddingVertical: 20,
     alignItems: "center",
-    backgroundColor: "#FFF",
+    backgroundColor: UI.card,
+    ...cardShadow,
   },
   cardSelected: { borderColor: GREEN, backgroundColor: LIGHT_GREEN },
   check: {
     position: "absolute",
     top: 8,
-    right: 10,
-    fontSize: 14,
-    color: GREEN,
-    fontWeight: "bold",
+    right: 8,
   },
-  cardEmoji: { fontSize: 34, marginBottom: 8 },
+  cardIcon: { marginBottom: 8 },
   cardName: { fontSize: 14, fontWeight: "600", color: DARK, textAlign: "center" },
   cardUnit: { fontSize: 12, color: GRAY, marginTop: 4 },
 
   footer: { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 4 },
   nextBtn: {
     backgroundColor: GREEN,
-    borderRadius: 10,
+    borderRadius: 14,
     height: 52,
     justifyContent: "center",
     alignItems: "center",

@@ -1,10 +1,10 @@
 import { Logo } from "@/components/logo";
+import { Ionicons } from "@expo/vector-icons";
 import { API_URL } from "@/config/api";
-import { saveToken } from "@/utils/storage";
+import { backToLogin } from "@/utils/nav";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,9 +14,52 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { UI } from "@/constants/ui";
 
 const GREEN = "#2E7D32";
 const DARK = "#1A1A1A";
+const RED = "#C62828";
+
+type Field = "name" | "email" | "password" | "confirm" | "terms";
+type FieldErrors = Partial<Record<Field, string>>;
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/** Same rules as the backend, checked before we send anything. */
+function validate(v: {
+  name: string;
+  email: string;
+  password: string;
+  confirm: string;
+  agreed: boolean;
+}): FieldErrors {
+  const e: FieldErrors = {};
+  if (!v.name.trim()) e.name = "Please enter your name";
+  else if (v.name.trim().length > 60) e.name = "Name must be 60 characters or fewer";
+
+  if (!v.email.trim()) e.email = "Please enter your email";
+  else if (!EMAIL_RE.test(v.email.trim())) e.email = "Enter a valid email address, like name@example.com";
+
+  if (!v.password) e.password = "Please enter a password";
+  else if (v.password.length < 8) e.password = "Password must be at least 8 characters";
+  else if (v.password.length > 72) e.password = "Password must be 72 characters or fewer";
+
+  if (!v.confirm) e.confirm = "Please confirm your password";
+  else if (v.password && v.confirm !== v.password) e.confirm = "Passwords don't match";
+
+  if (!v.agreed) e.terms = "Please accept the Terms of Service to continue";
+  return e;
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <View style={styles.errorRow} accessibilityLiveRegion="polite">
+      <Ionicons name="alert-circle" size={14} color={RED} />
+      <Text style={styles.errorText}>{message}</Text>
+    </View>
+  );
+}
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -28,47 +71,46 @@ export default function RegisterScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState("");
+
+  /** Update a field and clear its error as soon as the user edits it. */
+  const edit = (field: Field, setter: (v: string) => void) => (value: string) => {
+    setter(value);
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
+    if (formError) setFormError("");
+  };
 
   const handleRegister = async () => {
-    if (!name || !email || !password || !confirmPassword) {
-      Alert.alert("Error", "Please fill all fields");
-      return;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
-      return;
-    }
-    if (!agreed) {
-      Alert.alert("Error", "Please agree to Terms");
-      return;
-    }
+    const found = validate({ name, email, password, confirm: confirmPassword, agreed });
+    setErrors(found);
+    setFormError("");
+    if (Object.keys(found).length > 0) return;
 
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        Alert.alert("Error", data.message || "Registration failed");
+        const server: FieldErrors = {};
+        for (const field of ["name", "email", "password"] as const) {
+          if (data.fieldErrors?.[field]) server[field] = data.fieldErrors[field];
+        }
+        setErrors(server);
+        if (Object.keys(server).length === 0) {
+          setFormError(data.message || "Something went wrong. Please try again.");
+        }
         return;
       }
 
-      Alert.alert("Success", "Verification code sent to your email!", [
-        {
-          text: "OK",
-          onPress: () =>
-            router.push({
-              pathname: "/verify-code",
-              params: { email },
-            }),
-        },
-      ]);
+      router.push({ pathname: "/verify-code", params: { email: email.trim() } });
     } catch {
-      Alert.alert("Error", "Cannot connect to server");
+      setFormError("Can't reach the server. Check your internet connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -82,7 +124,7 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-      <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}>
+      <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : backToLogin(router))} accessibilityLabel="Go back">
         <Text style={styles.backArrow}>←</Text>
       </TouchableOpacity>
 
@@ -95,65 +137,96 @@ export default function RegisterScreen() {
 
       <Text style={styles.label}>Full Name</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, errors.name && styles.inputError]}
         placeholder="Full Name"
         placeholderTextColor="#999"
         value={name}
-        onChangeText={setName}
+        onChangeText={edit("name", setName)}
+        autoComplete="name"
+        textContentType="name"
       />
+      <FieldError message={errors.name} />
 
       <Text style={styles.label}>Email</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, errors.email && styles.inputError]}
         placeholder="Email"
         placeholderTextColor="#999"
         value={email}
-        onChangeText={setEmail}
+        onChangeText={edit("email", setEmail)}
         keyboardType="email-address"
         autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="email"
+        textContentType="emailAddress"
       />
+      <FieldError message={errors.email} />
 
       <Text style={styles.label}>Password</Text>
-      <View style={styles.passwordRow}>
+      <View style={[styles.passwordRow, errors.password && styles.inputError]}>
         <TextInput
           style={styles.passwordInput}
           placeholder="Password"
           placeholderTextColor="#999"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={edit("password", setPassword)}
           secureTextEntry={!showPassword}
+          autoComplete="new-password"
+          textContentType="newPassword"
         />
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-          <Text style={styles.eye}>{showPassword ? "🙈" : "👁"}</Text>
+          <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#666" style={styles.eye} />
         </TouchableOpacity>
       </View>
 
+      {errors.password ? (
+        <FieldError message={errors.password} />
+      ) : (
+        <Text style={styles.hint}>At least 8 characters</Text>
+      )}
+
       <Text style={styles.label}>Confirm Password</Text>
-      <View style={styles.passwordRow}>
+      <View style={[styles.passwordRow, errors.confirm && styles.inputError]}>
         <TextInput
           style={styles.passwordInput}
           placeholder="Confirm Password"
           placeholderTextColor="#999"
           value={confirmPassword}
-          onChangeText={setConfirmPassword}
+          onChangeText={edit("confirm", setConfirmPassword)}
           secureTextEntry={!showConfirm}
+          autoComplete="new-password"
+          textContentType="newPassword"
         />
         <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>
-          <Text style={styles.eye}>{showConfirm ? "🙈" : "👁"}</Text>
+          <Ionicons name={showConfirm ? "eye-off-outline" : "eye-outline"} size={20} color="#666" style={styles.eye} />
         </TouchableOpacity>
       </View>
+      <FieldError message={errors.confirm} />
 
       <TouchableOpacity
         style={styles.checkboxRow}
-        onPress={() => setAgreed(!agreed)}
+        onPress={() => {
+          setAgreed(!agreed);
+          if (errors.terms) setErrors((prev) => ({ ...prev, terms: undefined }));
+        }}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: agreed }}
       >
-        <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
-          {agreed && <Text style={styles.checkmark}>✓</Text>}
+        <View style={[styles.checkbox, agreed && styles.checkboxChecked, errors.terms && styles.checkboxError]}>
+          {agreed && <Ionicons name="checkmark" size={14} color="#FFF" />}
         </View>
         <Text style={styles.termsText}>
           I agree to Terms of Service and Privacy Policy
         </Text>
       </TouchableOpacity>
+      <FieldError message={errors.terms} />
+
+      {!!formError && (
+        <View style={styles.formError} accessibilityLiveRegion="polite">
+          <Ionicons name="alert-circle" size={18} color={RED} />
+          <Text style={styles.formErrorText}>{formError}</Text>
+        </View>
+      )}
 
       <TouchableOpacity
         style={[styles.button, loading && { opacity: 0.6 }]}
@@ -171,7 +244,7 @@ export default function RegisterScreen() {
         <View style={styles.line} />
       </View>
 
-      <TouchableOpacity onPress={() => router.push("/login")}>
+      <TouchableOpacity onPress={() => backToLogin(router)}>
         <Text style={styles.loginText}>
           Already have an account? <Text style={styles.loginLink}>Login</Text>
         </Text>
@@ -184,7 +257,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: UI.bg,
   },
   content: {
     paddingHorizontal: 20,
@@ -243,6 +316,44 @@ const styles = StyleSheet.create({
     color: "#333",
     backgroundColor: "#FFF",
   },
+  inputError: {
+    borderColor: RED,
+    borderWidth: 1.5,
+  },
+  errorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 6,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 12.5,
+    color: RED,
+  },
+  hint: {
+    fontSize: 12.5,
+    color: "#777",
+    marginTop: 6,
+  },
+  checkboxError: {
+    borderColor: RED,
+  },
+  formError: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FDECEA",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 18,
+  },
+  formErrorText: {
+    flex: 1,
+    fontSize: 13.5,
+    color: RED,
+  },
   passwordRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -259,7 +370,6 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   eye: {
-    fontSize: 18,
     paddingHorizontal: 14,
   },
   checkboxRow: {
@@ -280,11 +390,6 @@ const styles = StyleSheet.create({
   checkboxChecked: {
     backgroundColor: GREEN,
     borderColor: GREEN,
-  },
-  checkmark: {
-    color: "#FFF",
-    fontSize: 13,
-    fontWeight: "bold",
   },
   termsText: {
     fontSize: 13,

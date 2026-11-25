@@ -20,7 +20,9 @@ type ConnectionRow = {
   respondedAt: Date | null;
 };
 
-const PUBLIC_USER = { id: true, name: true } as const;
+const PUBLIC_USER = { id: true, name: true, username: true } as const;
+
+type PublicUser = { id: string; name: string; username: string };
 
 function otherUserId(connection: ConnectionRow, meId: string): string {
   return connection.userAId === meId ? connection.userBId : connection.userAId;
@@ -63,7 +65,7 @@ async function connectionsFor(userId: string): Promise<ConnectionRow[]> {
 }
 
 async function usersByIds(ids: string[]) {
-  if (ids.length === 0) return new Map<string, { id: string; name: string }>();
+  if (ids.length === 0) return new Map<string, PublicUser>();
   const users = await prisma.user.findMany({
     where: { id: { in: ids } },
     select: PUBLIC_USER,
@@ -86,6 +88,7 @@ usersRouter.get("/", requireAuth, async (req, res) => {
   if (query) {
     where.OR = [
       { name: { contains: query, mode: "insensitive" } },
+      { username: { contains: query.replace(/^@/, ""), mode: "insensitive" } },
       { email: { contains: query, mode: "insensitive" } },
     ];
   }
@@ -132,7 +135,7 @@ connectionsRouter.get("/", requireAuth, async (req, res) => {
       return {
         id: row.id,
         connectedAt: row.respondedAt,
-        user: users.get(otherId) ?? { id: otherId, name: "Unknown user" },
+        user: users.get(otherId) ?? { id: otherId, name: "Unknown user", username: "" },
       };
     }),
   });
@@ -161,7 +164,7 @@ connectionsRouter.get("/requests", requireAuth, async (req, res) => {
       return {
         id: row.id,
         createdAt: row.createdAt,
-        user: users.get(otherId) ?? { id: otherId, name: "Unknown user" },
+        user: users.get(otherId) ?? { id: otherId, name: "Unknown user", username: "" },
       };
     }),
   });
@@ -186,7 +189,7 @@ connectionsRouter.get("/requests/sent", requireAuth, async (req, res) => {
       return {
         id: row.id,
         createdAt: row.createdAt,
-        user: users.get(otherId) ?? { id: otherId, name: "Unknown user" },
+        user: users.get(otherId) ?? { id: otherId, name: "Unknown user", username: "" },
       };
     }),
   });
