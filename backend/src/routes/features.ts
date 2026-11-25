@@ -46,12 +46,14 @@ const goalSchema = z.object({
   deadline: z.string().regex(DATE_RE, "Use the format YYYY-MM-DD"),
 }).strict();
 
-// Fields a user may change after creating a goal. The unit, category and
-// visibility are fixed: changing them would change what the goal measures.
+// Fields a user may change after creating a goal. The unit and category are
+// fixed: changing them would change what the goal measures. Visibility can be
+// toggled so the goal can be shared on (or removed from) a public profile.
 const goalUpdateSchema = z.object({
   name: goalSchema.shape.name.optional(),
   targetValue: goalSchema.shape.targetValue.optional(),
   deadline: goalSchema.shape.deadline.optional(),
+  isPublic: z.boolean().optional(),
 }).strict().refine((v) => Object.keys(v).length > 0, { message: "Nothing to update" });
 
 /** End of the given day (UTC) as a Date, or null if it isn't a real future date. */
@@ -63,7 +65,7 @@ function parseFutureDeadline(value: string): Date | null {
   return deadline;
 }
 
-type GoalRow = {
+export type GoalRow = {
   id: string;
   name: string;
   targetValue: number;
@@ -73,7 +75,7 @@ type GoalRow = {
   isPublic: boolean;
   createdAt: Date;
 };
-type ActivityRow = { emission: number; createdAt: Date; category: string };
+export type ActivityRow = { emission: number; createdAt: Date; category: string };
 
 /**
  * Progress is measured from the user's own activity log between the goal's
@@ -83,7 +85,7 @@ type ActivityRow = { emission: number; createdAt: Date; category: string };
  *   - "days": how many different days had at least one activity (UTC dates)
  *   - "kg CO₂e": total emissions logged — an emissions budget to stay within
  */
-function withProgress(goal: GoalRow, activities: ActivityRow[]) {
+export function withProgress(goal: GoalRow, activities: ActivityRow[]) {
   const now = new Date();
   const inWindow = activities.filter(
     (a) =>
@@ -118,7 +120,7 @@ function withProgress(goal: GoalRow, activities: ActivityRow[]) {
   };
 }
 
-async function activitiesSince(userId: string, since: Date): Promise<ActivityRow[]> {
+export async function activitiesSince(userId: string, since: Date): Promise<ActivityRow[]> {
   return prisma.activityLog.findMany({
     where: { userId, createdAt: { gte: since } },
     select: { emission: true, createdAt: true, category: true },
@@ -145,13 +147,13 @@ router.get("/goals", async (req, res) => {
   res.json({ goals: goals.map((g) => withProgress(g, activities)) });
 });
 
-// PATCH /api/features/goals/:id — edit name, target and/or deadline of MY goal
+// PATCH /api/features/goals/:id — edit name, target, deadline or visibility of MY goal
 router.patch("/goals/:id", async (req, res) => {
   const parsed = goalUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
     const unknown = parsed.error.issues.find((i) => i.code === "unrecognized_keys");
     return res.status(400).json({
-      message: unknown ? "Only the goal's name, target and deadline can be changed" : parsed.error.issues[0]?.message ?? "Invalid goal details",
+      message: unknown ? "Only the goal's name, target, deadline and visibility can be changed" : parsed.error.issues[0]?.message ?? "Invalid goal details",
     });
   }
 
@@ -159,9 +161,10 @@ router.patch("/goals/:id", async (req, res) => {
   const existing = await prisma.goal.findFirst({ where: { id: String(req.params.id), userId: req.userId! } });
   if (!existing) return res.status(404).json({ message: "Goal not found" });
 
-  const data: { name?: string; targetValue?: number; deadline?: Date } = {};
+  const data: { name?: string; targetValue?: number; deadline?: Date; isPublic?: boolean } = {};
   if (parsed.data.name !== undefined) data.name = parsed.data.name;
   if (parsed.data.targetValue !== undefined) data.targetValue = parsed.data.targetValue;
+  if (parsed.data.isPublic !== undefined) data.isPublic = parsed.data.isPublic;
   if (parsed.data.deadline !== undefined) {
     const deadline = parseFutureDeadline(parsed.data.deadline);
     if (!deadline) return res.status(400).json({ message: "Choose a future deadline" });

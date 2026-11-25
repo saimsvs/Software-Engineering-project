@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { TAB_BAR_CLEARANCE, UI, cardShadow } from "@/constants/ui";
 import { apiFetch } from "@/utils/api";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -48,6 +49,7 @@ function initials(name: string): string {
 }
 
 export default function CommunityScreen() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<Person[]>([]);
   const [connections, setConnections] = useState<ConnectionItem[]>([]);
@@ -181,6 +183,10 @@ export default function CommunityScreen() {
       ]
     );
 
+  // Tapping the person (but not their action button) opens the public profile.
+  const openProfile = (user: { id: string; name: string }) =>
+    router.push({ pathname: "/user/[id]", params: { id: user.id } });
+
   const renderPersonAction = (person: Person) => {
     if (person.relationship === "connected") {
       return (
@@ -274,16 +280,23 @@ export default function CommunityScreen() {
             </Text>
             {requests.map((item) => (
               <View key={item.id} style={styles.card}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{initials(item.user.name)}</Text>
-                </View>
-                <View style={styles.personInfo}>
-                  <Text style={styles.personName}>{item.user.name}</Text>
-                  {!!item.user.username && (
-                    <Text style={styles.personUsername}>@{item.user.username}</Text>
-                  )}
-                  <Text style={styles.personMeta}>Wants to connect</Text>
-                </View>
+                <TouchableOpacity
+                  style={styles.personLink}
+                  activeOpacity={0.6}
+                  onPress={() => openProfile(item.user)}
+                  accessibilityLabel={`View ${item.user.name}'s public profile`}
+                >
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{initials(item.user.name)}</Text>
+                  </View>
+                  <View style={styles.personInfo}>
+                    <Text style={styles.personName}>{item.user.name}</Text>
+                    {!!item.user.username && (
+                      <Text style={styles.personUsername}>@{item.user.username}</Text>
+                    )}
+                    <Text style={styles.personMeta}>Wants to connect</Text>
+                  </View>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.primaryBtn}
                   onPress={() => respond(item.id, "accept")}
@@ -310,16 +323,23 @@ export default function CommunityScreen() {
             </Text>
             {connections.map((item) => (
               <View key={item.id} style={styles.card}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{initials(item.user.name)}</Text>
-                </View>
-                <View style={styles.personInfo}>
-                  <Text style={styles.personName}>{item.user.name}</Text>
-                  {!!item.user.username && (
-                    <Text style={styles.personUsername}>@{item.user.username}</Text>
-                  )}
-                  <Text style={styles.personMeta}>Connected</Text>
-                </View>
+                <TouchableOpacity
+                  style={styles.personLink}
+                  activeOpacity={0.6}
+                  onPress={() => openProfile(item.user)}
+                  accessibilityLabel={`View ${item.user.name}'s public profile`}
+                >
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{initials(item.user.name)}</Text>
+                  </View>
+                  <View style={styles.personInfo}>
+                    <Text style={styles.personName}>{item.user.name}</Text>
+                    {!!item.user.username && (
+                      <Text style={styles.personUsername}>@{item.user.username}</Text>
+                    )}
+                    <Text style={styles.personMeta}>Connected</Text>
+                  </View>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.secondaryBtn}
                   onPress={() => remove(item)}
@@ -346,24 +366,31 @@ export default function CommunityScreen() {
 
         {people.map((person) => (
           <View key={person.id} style={styles.card}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initials(person.name)}</Text>
-            </View>
-            <View style={styles.personInfo}>
-              <Text style={styles.personName}>{person.name}</Text>
-              {!!person.username && (
-                <Text style={styles.personUsername}>@{person.username}</Text>
-              )}
-              <Text style={styles.personMeta}>
-                {person.relationship === "connected"
-                  ? "Connected"
-                  : person.relationship === "request_sent"
-                  ? "Request sent"
-                  : person.relationship === "request_received"
-                  ? "Sent you a request"
-                  : "Not connected"}
-              </Text>
-            </View>
+            <TouchableOpacity
+              style={styles.personLink}
+              activeOpacity={0.6}
+              onPress={() => openProfile(person)}
+              accessibilityLabel={`View ${person.name}'s public profile`}
+            >
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initials(person.name)}</Text>
+              </View>
+              <View style={styles.personInfo}>
+                <Text style={styles.personName}>{person.name}</Text>
+                {!!person.username && (
+                  <Text style={styles.personUsername}>@{person.username}</Text>
+                )}
+                <Text style={styles.personMeta}>
+                  {person.relationship === "connected"
+                    ? "Connected"
+                    : person.relationship === "request_sent"
+                    ? "Request sent"
+                    : person.relationship === "request_received"
+                    ? "Sent you a request"
+                    : "Not connected"}
+                </Text>
+              </View>
+            </TouchableOpacity>
             {renderPersonAction(person)}
           </View>
         ))}
@@ -421,6 +448,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   avatarText: { fontSize: 16, fontWeight: "700", color: GREEN },
+  personLink: { flex: 1, flexDirection: "row", alignItems: "center" },
   personInfo: { flex: 1, marginLeft: 12 },
   personName: { fontSize: 15, fontWeight: "600", color: DARK },
   personUsername: { fontSize: 13, color: GREEN, marginTop: 1 },

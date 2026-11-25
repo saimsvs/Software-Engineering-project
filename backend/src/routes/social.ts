@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../config/db.js";
 import { requireAuth } from "../middleware/auth.js";
+import { buildPublicProfile } from "../services/publicProfile.js";
 
 export const usersRouter = Router();
 export const connectionsRouter = Router();
@@ -111,6 +112,26 @@ usersRouter.get("/", requireAuth, async (req, res) => {
       ...relationship(byOtherUser.get(user.id), meId),
     })),
   });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/users/:id/profile — another user's public carbon profile
+// ---------------------------------------------------------------------------
+// The response is assembled server-side from only the fields the profile owner
+// marked public. Private goals, private challenges and hidden trends never
+// enter the payload, and no email/password fields are selected.
+usersRouter.get("/:id/profile", requireAuth, async (req, res) => {
+  const userId = String(req.params.id);
+  if (!userId) return res.status(400).json({ message: "Invalid user id" });
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: PUBLIC_USER,
+  });
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  const shared = await buildPublicProfile(userId);
+  res.json({ profile: { user, ...shared } });
 });
 
 // ---------------------------------------------------------------------------

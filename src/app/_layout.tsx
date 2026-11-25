@@ -64,6 +64,7 @@ export default function RootLayout() {
           <Stack.Screen name="profile" />
           <Stack.Screen name="privacy" />
           <Stack.Screen name="goals" />
+          <Stack.Screen name="user/[id]" />
           <Stack.Screen name="stats" />
         </Stack>
       </SafeAreaView>
