@@ -26,6 +26,7 @@ const RED = "#D32F2F";
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const [userId, setUserId] = useState("");
   const [name, setName] = useState("...");
   const [email, setEmail] = useState("...");
   const [username, setUsername] = useState("");
@@ -42,6 +43,7 @@ export default function ProfileScreen() {
         ]);
         if (meRes.ok) {
           const { user } = await meRes.json();
+          setUserId(user.id);
           setName(user.name);
           setEmail(user.email);
           setUsername(user.username ?? "");
@@ -162,6 +164,13 @@ export default function ProfileScreen() {
         <View style={styles.card}>
           <Row icon="lock-closed-outline" label="Privacy & Location" onPress={() => router.push("/privacy")} />
           <Row icon="flag-outline" label="My Goals" onPress={() => router.push("/goals")} />
+          {!!userId && (
+            <Row
+              icon="eye-outline"
+              label="View My Public Profile"
+              onPress={() => router.push({ pathname: "/user/[id]", params: { id: userId } })}
+            />
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>Account</Text>

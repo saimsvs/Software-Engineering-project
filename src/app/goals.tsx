@@ -207,6 +207,40 @@ export default function GoalsScreen() {
     });
   }
 
+  async function toggleShare(g: Goal) {
+    setBusyId(g.id);
+    setFormError("");
+    setSuccess("");
+    try {
+      const response = await apiFetch(`/api/features/goals/${g.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isPublic: !g.isPublic }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        if (response.status === 404) {
+          setFormError("That goal no longer exists.");
+          await refresh();
+          return;
+        }
+        throw new Error(data.message ?? "Save failed");
+      }
+      const updated = (await response.json()).goal;
+      setGoals((prev) =>
+        prev.map((item) => (item.id === g.id ? { ...item, isPublic: updated.isPublic } : item))
+      );
+      setSuccess(
+        updated.isPublic
+          ? `"${g.name}" is now shown on your public profile.`
+          : `"${g.name}" is private again.`
+      );
+    } catch {
+      setFormError("Couldn't change that goal's visibility. Check your connection and try again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function save() {
     const found = validate(name, target, deadline);
     setErrors(found);
@@ -263,7 +297,7 @@ export default function GoalsScreen() {
           <Text style={s.help}>
             {editingId
               ? "Change the name, target or deadline. The unit and what counts stay the same."
-              : "Make a measurable commitment. New goals are private by default."}
+              : "Make a measurable commitment. New goals are private by default; share them from your list below."}
           </Text>
 
           <Text style={s.label}>Goal name</Text>
@@ -414,7 +448,7 @@ export default function GoalsScreen() {
                     <Text style={s.help}>
                       Due {g.deadline.slice(0, 10)}
                       {daysLeft > 0 ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : " · Ended"}
-                      {" · Private"}
+                      {g.isPublic ? " · Public" : " · Private"}
                     </Text>
                   </View>
                   {st && (
@@ -445,6 +479,29 @@ export default function GoalsScreen() {
                 )}
 
                 <View style={s.goalActions}>
+                  <TouchableOpacity
+                    style={s.actionBtn}
+                    onPress={() => toggleShare(g)}
+                    disabled={busyId === g.id}
+                    accessibilityLabel={
+                      g.isPublic
+                        ? `Make ${g.name} private`
+                        : `Share ${g.name} on your public profile`
+                    }
+                  >
+                    <Ionicons
+                      name={g.isPublic ? "eye-off-outline" : "share-outline"}
+                      size={16}
+                      color={UI.green}
+                    />
+                    <Text style={[s.actionText, s.shareText]}>
+                      {busyId === g.id
+                        ? "…"
+                        : g.isPublic
+                          ? "Make private"
+                          : "Share"}
+                    </Text>
+                  </TouchableOpacity>
                   <TouchableOpacity
                     style={s.actionBtn}
                     onPress={() => startEdit(g)}
@@ -529,6 +586,7 @@ const s = StyleSheet.create({
   },
   actionBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 10, backgroundColor: "#F5F6F5" },
   actionText: { fontSize: 13.5, fontWeight: "600", color: UI.ink },
+  shareText: { color: UI.green },
   cardEditing: { borderWidth: 1.5, borderColor: UI.green },
   choiceLocked: { opacity: 0.4 },
   countsText: { fontSize: 12.5, color: UI.green, fontWeight: "600", marginBottom: 1 },

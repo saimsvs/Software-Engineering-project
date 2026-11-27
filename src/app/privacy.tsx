@@ -105,8 +105,9 @@ export default function PrivacyScreen() {
           </View>
 
           <Text style={s.note}>
-            Goals and challenges have their own per-item visibility controls. Turning off location sharing
-            prevents new location contributions; it does not delete previous contributions.
+            Goals have their own sharing controls in My Goals. Challenges aren't available in the app yet.
+            Turning off location sharing prevents new location contributions; it does not delete previous
+            contributions.
           </Text>
           {saving && <ActivityIndicator color={UI.green} />}
         </ScrollView>

@@ -22,6 +22,10 @@ function matchesValue(value: any, condition: any): boolean {
         : haystack.includes(needle);
     }
     if ("equals" in condition) return value === condition.equals;
+    if ("gte" in condition) return value >= condition.gte;
+    if ("lte" in condition) return value <= condition.lte;
+    if ("gt" in condition) return value > condition.gt;
+    if ("lt" in condition) return value < condition.lt;
   }
   return value === condition;
 }
@@ -71,6 +75,8 @@ export function createFakePrisma() {
   let activities: Row[] = [];
   let organizers: Row[] = [];
   let connections: Row[] = [];
+  let goals: Row[] = [];
+  let privacySettings: Row[] = [];
 
   const nextId = (prefix: string) => `${prefix}_${++seq}`;
   // Monotonic timestamps keep "order by createdAt" deterministic in tests.
@@ -226,12 +232,64 @@ export function createFakePrisma() {
       connections.filter((c) => matches(c, where)).length,
   };
 
+  const goal = {
+    create: async ({ data }: any) => {
+      const row: Row = {
+        id: nextId("goal"),
+        isPublic: false,
+        category: null,
+        createdAt: now(),
+        ...data,
+      };
+      goals.push(row);
+      return { ...row };
+    },
+    findMany: async ({ where, orderBy, take }: any = {}) => {
+      const found = sortRows(goals.filter((g) => matches(g, where)), orderBy);
+      return (take ? found.slice(0, take) : found).map((row) => ({ ...row }));
+    },
+    findFirst: async ({ where }: any) => {
+      const row = goals.find((g) => matches(g, where));
+      return row ? { ...row } : null;
+    },
+    update: async ({ where, data }: any) => {
+      const row = goals.find((g) => matches(g, where));
+      if (!row) throw new Error("Goal not found");
+      Object.assign(row, data);
+      return { ...row };
+    },
+    deleteMany: async ({ where }: any = {}) => {
+      const before = goals.length;
+      goals = goals.filter((g) => !matches(g, where));
+      return { count: before - goals.length };
+    },
+  };
+
+  const privacySetting = {
+    findUnique: async ({ where }: any) => {
+      const row = privacySettings.find((s) => matches(s, where));
+      return row ? { ...row } : null;
+    },
+    upsert: async ({ where, create, update }: any) => {
+      const row = privacySettings.find((s) => matches(s, where));
+      if (row) {
+        Object.assign(row, update, { updatedAt: now() });
+        return { ...row };
+      }
+      const created = { ...create, updatedAt: now() };
+      privacySettings.push(created);
+      return { ...created };
+    },
+  };
+
   return {
     user,
     emailVerificationCode,
     activityLog,
     organizer,
     connection,
+    goal,
+    privacySetting,
 
     reset() {
       seq = 0;
@@ -240,6 +298,8 @@ export function createFakePrisma() {
       activities = [];
       organizers = [];
       connections = [];
+      goals = [];
+      privacySettings = [];
     },
 
     seed: {
@@ -293,6 +353,27 @@ export function createFakePrisma() {
         connections.push(row);
         return { ...row };
       },
+      goal(data: Row) {
+        const row: Row = {
+          id: nextId("goal"),
+          isPublic: false,
+          category: null,
+          createdAt: now(),
+          ...data,
+        };
+        goals.push(row);
+        return { ...row };
+      },
+      privacySetting(data: Row) {
+        const row: Row = {
+          locationSharingEnabled: false,
+          showTrendsPublic: false,
+          updatedAt: now(),
+          ...data,
+        };
+        privacySettings.push(row);
+        return { ...row };
+      },
     },
 
     // Escape hatches for assertions.
@@ -301,5 +382,7 @@ export function createFakePrisma() {
     _activities: () => activities,
     _organizers: () => organizers,
     _connections: () => connections,
+    _goals: () => goals,
+    _privacySettings: () => privacySettings,
   };
 }
