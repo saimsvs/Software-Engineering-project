@@ -1,9 +1,10 @@
 import { ScreenHeader } from "@/components/screen-header";
 import { UI, cardShadow } from "@/constants/ui";
 import { apiFetch } from "@/utils/api";
+import { askLocationPermission, contributeArea, formatArea, type Area } from "@/utils/area-location";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const RED = "#C62828";
@@ -14,21 +15,57 @@ export default function PrivacyScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // US21: the map area this user contributes to (a ~11 km square), if any.
+  const [area, setArea] = useState<Area | null>(null);
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
-    apiFetch("/api/features/privacy")
-      .then(async (response) => {
-        if (!response.ok) throw new Error();
-        const data = await response.json();
+    Promise.all([apiFetch("/api/features/privacy"), apiFetch("/api/features/location")])
+      .then(async ([privacyRes, locationRes]) => {
+        if (!privacyRes.ok) throw new Error();
+        const data = await privacyRes.json();
         setLocation(data.settings.locationSharingEnabled);
         setTrends(data.settings.showTrendsPublic);
+        if (locationRes.ok) setArea((await locationRes.json()).area);
       })
       .catch(() => setError("Couldn't load your settings. Nothing has been changed."))
       .finally(() => setLoading(false));
   }, []);
 
-  async function save(nextLocation: boolean, nextTrends: boolean) {
-    if (saving) return;
+  /** Read the phone's rough position and send its map area (never the exact spot). */
+  async function updateArea() {
+    setLocating(true);
+    setError("");
+    try {
+      setArea(await contributeArea());
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message === "PERMISSION"
+          ? "CarbonTrail can't use your location. Allow it in your phone's Settings, then tap Update my area."
+          : "Couldn't get your area right now. Tap Update my area to try again."
+      );
+    } finally {
+      setLocating(false);
+    }
+  }
+
+  async function toggleLocation(next: boolean) {
+    setError("");
+    if (next) {
+      // 1. Ask the phone for permission first. Without it, sharing stays off.
+      if (!(await askLocationPermission())) {
+        setError("Location permission wasn't given, so location sharing is still off. You can allow it in your phone's Settings.");
+        return;
+      }
+      // 2. Save the setting, 3. then send this user's area.
+      if (await save(true, trends)) await updateArea();
+    } else if (await save(false, trends)) {
+      setArea(null); // the server also removes the user's area from the map
+    }
+  }
+
+  async function save(nextLocation: boolean, nextTrends: boolean): Promise<boolean> {
+    if (saving) return false;
     setSaving(true);
     setError("");
     try {
@@ -40,8 +77,10 @@ export default function PrivacyScreen() {
       const data = await response.json();
       setLocation(data.settings.locationSharingEnabled);
       setTrends(data.settings.showTrendsPublic);
+      return true;
     } catch {
       setError("Your change wasn't saved. Check your connection and try again.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -69,16 +108,39 @@ export default function PrivacyScreen() {
               <Ionicons name="location-outline" size={20} color={UI.green} />
             </View>
             <View style={s.text}>
-              <Text style={s.label}>Share location data</Text>
+              <Text style={s.label}>Contribute to the Carbon Map</Text>
               <Text style={s.hint}>
-                Allow future opted-in location contributions to area-level carbon statistics. Your exact
-                location is never displayed publicly.
+                Add your estimated emissions to your area on the public Carbon Map. Only a rough area
+                (about 11 km across) is saved, never your exact location, and areas with fewer than 3
+                people aren&apos;t shown.
               </Text>
+              {location && (
+                <View style={s.areaBox}>
+                  {locating ? (
+                    <Text style={s.areaText}>Finding your area…</Text>
+                  ) : area ? (
+                    <Text style={s.areaText}>
+                      Contributing to the area around <Text style={s.areaStrong}>{formatArea(area)}</Text>
+                    </Text>
+                  ) : (
+                    <Text style={s.areaText}>Not contributing yet.</Text>
+                  )}
+                  <Pressable
+                    onPress={updateArea}
+                    disabled={locating}
+                    style={({ pressed }) => [s.areaBtn, (pressed || locating) && { opacity: 0.6 }]}
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="refresh" size={14} color={UI.green} />
+                    <Text style={s.areaBtnText}>Update my area</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
             <Switch
               value={location}
-              disabled={saving}
-              onValueChange={(v) => save(v, trends)}
+              disabled={saving || locating}
+              onValueChange={toggleLocation}
               trackColor={{ true: "#9CCC9F" }}
               thumbColor={location ? UI.green : "#F4F4F4"}
             />
@@ -98,15 +160,15 @@ export default function PrivacyScreen() {
             <Switch
               value={trends}
               disabled={saving}
-              onValueChange={(v) => save(location, v)}
+              onValueChange={(v) => void save(location, v)}
               trackColor={{ true: "#9CCC9F" }}
               thumbColor={trends ? UI.green : "#F4F4F4"}
             />
           </View>
 
           <Text style={s.note}>
-            Goals and challenges have their own per-item visibility controls. Turning off location sharing
-            prevents new location contributions; it does not delete previous contributions.
+            Goals and challenges have their own per-item visibility controls. Turning off Carbon Map
+            sharing stops new contributions and removes your area from the map straight away.
           </Text>
           {saving && <ActivityIndicator color={UI.green} />}
         </ScrollView>
@@ -152,4 +214,9 @@ const s = StyleSheet.create({
     paddingVertical: 12,
   },
   errorText: { flex: 1, fontSize: 13.5, color: RED },
+  areaBox: { marginTop: 10, backgroundColor: UI.greenSoft, borderRadius: 10, padding: 10, gap: 8 },
+  areaText: { fontSize: 13, color: UI.ink, lineHeight: 18 },
+  areaStrong: { fontWeight: "700" },
+  areaBtn: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start" },
+  areaBtnText: { fontSize: 13, fontWeight: "600", color: UI.green },
 });
