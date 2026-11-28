@@ -78,6 +78,7 @@ model Organizer {
   name         String
   passwordHash String
   organizerId  String   @id @unique @default(cuid())
+  challenges Challenge[]
 }
 
 
@@ -95,6 +96,7 @@ model Goal {
   name        String @db.VarChar(120)
   targetValue Float
   targetUnit  String @db.VarChar(32)
+  targetDirection String @default("at_least")
   /// Which activity category counts toward the goal; null = every activity.
   category    String? @db.VarChar(32)
   deadline    DateTime
@@ -103,5 +105,26 @@ model Goal {
   user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, createdAt])
 }
+
+
+model Challenge {
+  id            String    @id @default(cuid())
+  organizerId   String
+  name          String    @db.VarChar(120)
+  description   String    @db.Text
+  targetValue   Float
+  targetUnit    String    @db.VarChar(32)
+  startDate     DateTime
+  endDate       DateTime
+  activityRules Json
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  organizer     Organizer @relation(fields: [organizerId], references: [organizerId], onDelete: Restrict)
+
+  @@index([startDate, endDate])
+  @@index([organizerId])
+}
+
 
 

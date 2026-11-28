@@ -46,7 +46,8 @@
           "imageWidth": 200
         }
       ],
-      "./plugins/with-ios-scene-lifecycle"
+      "./plugins/with-ios-scene-lifecycle",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
