@@ -295,4 +295,180 @@ router.get("/:id", async (req, res) => {
   });
 });
 
+
+// --------------------------------------------------
+// PATCH /api/challenges/:id
+// Edit challenge — owning organizer only
+// --------------------------------------------------
+
+const editChallengeSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    description: z.string().trim().min(1).optional(),
+    startDate: z.iso.datetime({ offset: true }).optional(),
+    endDate: z.iso.datetime({ offset: true }).optional(),
+  })
+  .strict()
+  .refine(
+    (data) => Object.keys(data).length > 0,
+    "Provide at least one field to update"
+  );
+
+router.patch("/:id", requireOrganizer, async (req, res) => {
+  const challengeId = req.params.id as string;
+
+  // 1. Check whether the challenge exists.
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+  });
+
+  if (!challenge) {
+    return res.status(404).json({
+      message: "Challenge not found",
+    });
+  }
+
+  // 3. Validate the submitted fields.
+  const parsed = editChallengeSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: "Invalid challenge update",
+      fieldErrors: z.flattenError(parsed.error).fieldErrors,
+    });
+  }
+
+  const data = parsed.data;
+  const status = challengeStatus(
+    challenge.startDate,
+    challenge.endDate
+  );
+
+  // 4. Completed challenges cannot be edited.
+  if (status === "completed") {
+    return res.status(409).json({
+      message: "Completed challenges cannot be edited",
+    });
+  }
+
+  // 5. Active challenges allow description changes only.
+  if (
+    status === "active" &&
+    Object.keys(data).some((field) => field !== "description")
+  ) {
+    return res.status(409).json({
+      message:
+        "Only the description of an active challenge can be edited",
+    });
+  }
+
+  // 6. Check dates, including unchanged dates.
+  const newStartDate = data.startDate
+    ? new Date(data.startDate)
+    : challenge.startDate;
+
+  const newEndDate = data.endDate
+    ? new Date(data.endDate)
+    : challenge.endDate;
+
+  if (newEndDate.getTime() <= newStartDate.getTime()) {
+    return res.status(400).json({
+      message: "End date must be after start date",
+    });
+  }
+
+  // 7. Prevent moving an upcoming challenge into the past.
+  if (
+    status === "upcoming" &&
+    newStartDate.getTime() <= Date.now()
+  ) {
+    return res.status(400).json({
+      message: "An upcoming challenge must start in the future",
+    });
+  }
+
+  // 8. Apply the authorized changes.
+  const updated = await prisma.challenge.update({
+    where: { id: challengeId },
+    data: {
+      ...(data.name !== undefined && { name: data.name }),
+      ...(data.description !== undefined && {
+        description: data.description,
+      }),
+      ...(data.startDate !== undefined && {
+        startDate: newStartDate,
+      }),
+      ...(data.endDate !== undefined && {
+        endDate: newEndDate,
+      }),
+    },
+  });
+
+  return res.json({
+    message: "Challenge updated successfully",
+    challenge: {
+      ...updated,
+      status: challengeStatus(
+        updated.startDate,
+        updated.endDate
+      ),
+    },
+  });
+});
+
+
+// --------------------------------------------------
+// DELETE /api/challenges/:id
+// Delete an upcoming challenge — owning organizer only
+// --------------------------------------------------
+
+router.delete("/:id", requireOrganizer, async (req, res) => {
+  const challengeId = req.params.id as string;
+
+  // 1. Find the challenge.
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+  });
+
+  if (!challenge) {
+    return res.status(404).json({
+      message: "Challenge not found",
+    });
+  }
+
+  // 3. Only upcoming challenges can be deleted.
+  const status = challengeStatus(
+    challenge.startDate,
+    challenge.endDate
+  );
+
+  if (status !== "upcoming") {
+    return res.status(409).json({
+      message:
+        "Only upcoming challenges can be deleted",
+    });
+  }
+
+  // 4. Delete only if ownership and date restrictions
+  // still hold when the database operation executes.
+  const result = await prisma.challenge.deleteMany({
+    where: {
+      id: challengeId,
+      startDate: { gt: new Date() },
+    },
+  });
+
+  if (result.count === 0) {
+    return res.status(409).json({
+      message:
+        "Challenge could not be deleted because its status changed",
+    });
+  }
+
+  return res.json({
+    message: "Challenge deleted successfully",
+  });
+});
+
+
 export default router;
