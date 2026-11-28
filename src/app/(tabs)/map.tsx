@@ -1,6 +1,7 @@
 import CarbonMapView from "@/components/carbon-map-view";
 import { UI, cardShadow } from "@/constants/ui";
 import { apiFetch } from "@/utils/api";
+import { getMyPositionIfAllowed } from "@/utils/area-location";
 import { LEVELS, areaKey, formatCoords, levelFor, type MapArea } from "@/utils/carbon-map";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -18,6 +19,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
  */
 
 type MapData = { windowDays: number; minPeoplePerArea: number; areaStep: number; areas: MapArea[] };
+type Point = { latitude: number; longitude: number };
 
 /** The floating tab bar is ~52px tall and sits 10px above the bottom edge. */
 const ABOVE_TAB_BAR = 74;
@@ -30,12 +32,22 @@ export default function MapScreen() {
   const [showInfo, setShowInfo] = useState(false);
   // Bumped by the "show all areas" button; the map re-zooms when it changes.
   const [recenter, setRecenter] = useState(0);
+  // The area this viewer shares (from Privacy), and their phone's own position (blue dot).
+  const [myArea, setMyArea] = useState<Point | null>(null);
+  const [me, setMe] = useState<Point | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const res = await apiFetch("/api/features/carbon-map");
-      if (!res.ok) throw new Error();
-      setData(await res.json());
+      const [mapRes, mineRes] = await Promise.all([
+        apiFetch("/api/features/carbon-map"),
+        apiFetch("/api/features/location"),
+      ]);
+      if (!mapRes.ok) throw new Error();
+      setData(await mapRes.json());
+      if (mineRes.ok) {
+        const area = (await mineRes.json()).area;
+        setMyArea(area ? { latitude: area.latitude, longitude: area.longitude } : null);
+      }
       setStatus("ready");
     } catch {
       setStatus((s) => (s === "ready" ? s : "error")); // keep showing old data if a refresh fails
@@ -46,6 +58,8 @@ export default function MapScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
+      // Blue dot: only if location permission was already given; stays on this phone.
+      getMyPositionIfAllowed().then(setMe);
     }, [load])
   );
 
@@ -56,6 +70,10 @@ export default function MapScreen() {
 
   const selected = data?.areas.find((a) => areaKey(a) === selectedKey) ?? null;
   const level = selected ? levelFor(selected.averageKgPerPerson) : null;
+  const myKey = myArea ? areaKey(myArea) : null;
+  const myAreaShown = !!data && !!myKey && data.areas.some((a) => areaKey(a) === myKey);
+  // The viewer tapped their own area while it's still hidden (fewer than 3 people).
+  const myHiddenSelected = !!myKey && selectedKey === myKey && !myAreaShown;
 
   // ----- No data yet: loading / error take the whole screen -----
   if (!data) {
@@ -92,6 +110,9 @@ export default function MapScreen() {
         selectedKey={selectedKey}
         onSelect={select}
         recenter={recenter}
+        myArea={myArea}
+        myAreaShown={myAreaShown}
+        me={me}
         dom={{ style: { flex: 1 }, scrollEnabled: false }}
       />
 
@@ -107,6 +128,10 @@ export default function MapScreen() {
           />
           <InfoRow icon="eye-off-outline" text="No individual users or exact locations are ever shown." />
           <InfoRow
+            icon="navigate-circle-outline"
+            text="The blue dot is your own position. Only you can see it, and it never leaves your phone."
+          />
+          <InfoRow
             icon="calculator-outline"
             text={`Values are estimated CO₂e from activities logged in the last ${data.windowDays} days.`}
           />
@@ -116,7 +141,23 @@ export default function MapScreen() {
 
       {/* Bottom panel, just above the tab bar. */}
       <View style={[s.card, s.panel]}>
-        {data.areas.length === 0 ? (
+        {myHiddenSelected && myArea ? (
+          <View style={s.row}>
+            <View style={s.iconBubble}>
+              <Ionicons name="home-outline" size={18} color={UI.green} />
+            </View>
+            <View style={s.flex}>
+              <Text style={s.panelTitle}>Your area</Text>
+              <Text style={s.panelSub}>
+                Near {formatCoords(myArea)}. Its data appears once {data.minPeoplePerArea} or more people share their
+                location here.
+              </Text>
+            </View>
+            <Pressable onPress={() => setSelectedKey(null)} hitSlop={10} style={s.closeBtn} accessibilityLabel="Close">
+              <Ionicons name="close" size={16} color={UI.muted} />
+            </Pressable>
+          </View>
+        ) : data.areas.length === 0 ? (
           <>
             <View style={s.row}>
               <View style={s.iconBubble}>
@@ -125,20 +166,31 @@ export default function MapScreen() {
               <View style={s.flex}>
                 <Text style={s.panelTitle}>No areas to show yet</Text>
                 <Text style={s.panelSub}>
-                  An area appears once {data.minPeoplePerArea} or more people share their location there.
+                  {myArea
+                    ? `You're sharing your area. Data appears once ${data.minPeoplePerArea} or more people share there.`
+                    : `An area appears once ${data.minPeoplePerArea} or more people share their location there.`}
                 </Text>
               </View>
             </View>
-            <Pressable onPress={() => router.push("/privacy")} style={({ pressed }) => [s.primaryBtn, pressed && s.pressed]}>
-              <Text style={s.primaryBtnText}>Share my area</Text>
-            </Pressable>
+            {!myArea && (
+              <Pressable onPress={() => router.push("/privacy")} style={({ pressed }) => [s.primaryBtn, pressed && s.pressed]}>
+                <Text style={s.primaryBtnText}>Share my area</Text>
+              </Pressable>
+            )}
           </>
         ) : selected && level ? (
           <>
             <View style={s.row}>
               <View style={[s.levelDot, { backgroundColor: level.color }]} />
               <View style={s.flex}>
-                <Text style={s.panelTitle}>Area near {formatCoords(selected)}</Text>
+                <View style={s.titleRow}>
+                  <Text style={s.panelTitle}>Area near {formatCoords(selected)}</Text>
+                  {selectedKey === myKey && (
+                    <View style={s.youTag}>
+                      <Text style={s.youTagText}>Your area</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={s.panelSub}>
                   {level.label} emissions · about {Math.round(data.areaStep * 111)} km wide
                 </Text>
@@ -293,7 +345,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   levelDot: { width: 12, height: 12, borderRadius: 6, marginHorizontal: 4 },
-  panelTitle: { fontSize: 15, fontWeight: "700", color: UI.ink },
+  panelTitle: { fontSize: 15, fontWeight: "700", color: UI.ink, flexShrink: 1 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  youTag: { backgroundColor: UI.greenSoft, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  youTagText: { fontSize: 11, fontWeight: "700", color: UI.green },
   panelSub: { fontSize: 12.5, color: UI.muted, marginTop: 2, lineHeight: 17 },
   closeBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: UI.bg, alignItems: "center", justifyContent: "center" },
   stats: { flexDirection: "row", gap: 8 },
