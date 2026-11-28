@@ -31,6 +31,12 @@
       "expo-router",
       "expo-system-ui",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CarbonTrail uses your approximate area (never your exact location) to add your estimated emissions to the public area-level Carbon Map. You can turn this off anytime in Privacy."
+        }
+      ],
+      [
         "expo-navigation-bar",
         {
           "enforceContrast": false,

@@ -17,6 +17,7 @@ model User {
   updatedAt         DateTime                @updatedAt
   emailVerified     Boolean                 @default(false)
   privacySetting    PrivacySetting?
+  areaContribution  AreaContribution?
   goals             Goal[]
   activityLogs      ActivityLog[]
   verificationCodes EmailVerificationCode[]
@@ -87,6 +88,20 @@ model PrivacySetting {
   showTrendsPublic       Boolean @default(false)
   updatedAt              DateTime @updatedAt
   user                   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// US21: the map area a user contributes to. Only a coarse grid cell is stored
+/// (the centre of a ~11 km square) — never the user's exact coordinates.
+/// One row per user; deleted when they turn location sharing off.
+model AreaContribution {
+  userId    String   @id
+  areaKey   String   @db.VarChar(32) // e.g. "24.9:67.1" — the grid cell's centre
+  areaLat   Float
+  areaLng   Float
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([areaKey])
 }
 
 model Goal {

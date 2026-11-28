@@ -23,12 +23,111 @@ router.get("/privacy", async (req, res) => {
 router.put("/privacy", async (req, res) => {
   const parsed = privacySchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: "Invalid privacy settings" });
-  const settings = await prisma.privacySetting.upsert({
-    where: { userId: req.userId! },
-    create: { userId: req.userId!, ...parsed.data },
-    update: parsed.data,
-  });
+  const [settings] = await prisma.$transaction([
+    prisma.privacySetting.upsert({
+      where: { userId: req.userId! },
+      create: { userId: req.userId!, ...parsed.data },
+      update: parsed.data,
+    }),
+    // US21: turning location sharing off removes the user's area from the map
+    // straight away, and /location refuses new contributions while it's off.
+    ...(parsed.data.locationSharingEnabled
+      ? []
+      : [prisma.areaContribution.deleteMany({ where: { userId: req.userId! } })]),
+  ]);
   res.json({ settings });
+});
+
+// ---------------------------------------------------------------------------
+// US21 — Contribute location to the Carbon Map
+// ---------------------------------------------------------------------------
+
+/** Grid size in degrees. 0.1° is roughly an 11 km square — a district, not a street. */
+const AREA_STEP = 0.1;
+/** An area appears on the public map only once this many people contribute to it,
+ *  so no single person's emissions can be picked out. */
+const MIN_PEOPLE_PER_AREA = 3;
+/** The map shows emissions from the last 30 days. */
+const MAP_WINDOW_DAYS = 30;
+
+/** Snap a coordinate to the centre of its grid cell, e.g. 24.8607 → 24.85. */
+function snapToArea(value: number) {
+  const cell = Math.floor(value / AREA_STEP);
+  return Math.round((cell * AREA_STEP + AREA_STEP / 2) * 100) / 100;
+}
+
+const locationSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+}).strict();
+
+// POST /api/features/location — record which area the user is in.
+router.post("/location", async (req, res) => {
+  const parsed = locationSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Invalid location" });
+
+  const settings = await prisma.privacySetting.findUnique({ where: { userId: req.userId! } });
+  if (!settings?.locationSharingEnabled) {
+    return res.status(403).json({ code: "LOCATION_SHARING_OFF", message: "Turn on location sharing in Privacy first." });
+  }
+
+  // The app already sends a rounded position, but snap again here so exact
+  // coordinates can never be stored, whatever a client sends.
+  const areaLat = snapToArea(parsed.data.latitude);
+  const areaLng = snapToArea(parsed.data.longitude);
+  const areaKey = `${areaLat}:${areaLng}`;
+
+  await prisma.areaContribution.upsert({
+    where: { userId: req.userId! },
+    create: { userId: req.userId!, areaKey, areaLat, areaLng },
+    update: { areaKey, areaLat, areaLng },
+  });
+  res.json({ area: { latitude: areaLat, longitude: areaLng, sizeKm: 11 } });
+});
+
+// GET /api/features/location — the area the user currently contributes to (only theirs).
+router.get("/location", async (req, res) => {
+  const row = await prisma.areaContribution.findUnique({ where: { userId: req.userId! } });
+  res.json({ area: row ? { latitude: row.areaLat, longitude: row.areaLng, sizeKm: 11, updatedAt: row.updatedAt } : null });
+});
+
+// GET /api/features/carbon-map — public, area-level totals. No user ids, names
+// or exact positions; areas with fewer than MIN_PEOPLE_PER_AREA people are hidden.
+router.get("/carbon-map", async (_req, res) => {
+  const since = new Date(Date.now() - MAP_WINDOW_DAYS * 86400000);
+  const contributions = await prisma.areaContribution.findMany({
+    // Double-check the setting, in case a row outlived a switch-off.
+    where: { user: { privacySetting: { locationSharingEnabled: true } } },
+    select: { userId: true, areaKey: true, areaLat: true, areaLng: true },
+  });
+  const emissions = await prisma.activityLog.groupBy({
+    by: ["userId"],
+    where: { userId: { in: contributions.map((c) => c.userId) }, createdAt: { gte: since } },
+    _sum: { emission: true },
+  });
+  const perUser = new Map(emissions.map((e) => [e.userId, e._sum.emission ?? 0]));
+
+  const areas = new Map<string, { latitude: number; longitude: number; people: number; total: number }>();
+  for (const c of contributions) {
+    const a = areas.get(c.areaKey) ?? { latitude: c.areaLat, longitude: c.areaLng, people: 0, total: 0 };
+    a.people += 1;
+    a.total += perUser.get(c.userId) ?? 0;
+    areas.set(c.areaKey, a);
+  }
+
+  res.json({
+    windowDays: MAP_WINDOW_DAYS,
+    minPeoplePerArea: MIN_PEOPLE_PER_AREA,
+    areas: [...areas.values()]
+      .filter((a) => a.people >= MIN_PEOPLE_PER_AREA)
+      .map((a) => ({
+        latitude: a.latitude,
+        longitude: a.longitude,
+        people: a.people,
+        totalKg: Math.round(a.total * 10) / 10,
+        averageKgPerPerson: Math.round((a.total / a.people) * 10) / 10,
+      })),
+  });
 });
 
 const GOAL_UNITS = ["kg CO₂e", "activities", "days"] as const;
