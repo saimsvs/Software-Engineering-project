@@ -118,6 +118,7 @@ router.get("/carbon-map", async (_req, res) => {
   res.json({
     windowDays: MAP_WINDOW_DAYS,
     minPeoplePerArea: MIN_PEOPLE_PER_AREA,
+    areaStep: AREA_STEP, // US22: lets the map draw each area as its real grid square
     areas: [...areas.values()]
       .filter((a) => a.people >= MIN_PEOPLE_PER_AREA)
       .map((a) => ({
