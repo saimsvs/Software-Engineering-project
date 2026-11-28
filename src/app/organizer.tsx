@@ -1,4 +1,4 @@
-
+import ChallengeManagerCard from "@/components/challenge-manager-card";
 import { ACTIVITIES } from "@/data/activities";
 import ChallengeDateInput from "@/components/challenge-date-input";
 import { apiFetch } from "@/utils/api";
@@ -615,52 +615,11 @@ export default function OrganizerScreen() {
         </Text>
       ) : (
         challenges.map((challenge) => (
-          <View
+          <ChallengeManagerCard
             key={challenge.id}
-            style={styles.challengeCard}
-          >
-            <View style={styles.challengeHeading}>
-              <Text style={styles.challengeName}>
-                {challenge.name}
-              </Text>
-
-              <Text style={styles.status}>
-                {challenge.status.toUpperCase()}
-              </Text>
-            </View>
-
-            <Text style={styles.description}>
-              {challenge.description}
-            </Text>
-
-            <Text style={styles.challengeMeta}>
-              Target:{" "}
-              {challenge.targetDirection === "at_most"
-                ? "At most"
-                : "At least"}{" "}
-              {challenge.targetValue}{" "}
-              {labelForUnit(challenge.targetUnit)}
-            </Text>
-
-            <Text style={styles.challengeMeta}>
-              {challenge.startDate.slice(0, 10)} to{" "}
-              {challenge.endDate.slice(0, 10)}
-            </Text>
-
-            {!!challenge.activityRules?.activityIds?.length && (
-              <Text style={styles.challengeMeta}>
-                Activities:{" "}
-                {challenge.activityRules.activityIds
-                  .map(
-                    (id) =>
-                      ACTIVITIES.find(
-                        (activity) => activity.id === id
-                      )?.name ?? id
-                  )
-                  .join(", ")}
-              </Text>
-            )}
-          </View>
+            challenge={challenge}
+            onChanged={loadChallenges}
+          />
         ))
       )}
     </ScrollView>
