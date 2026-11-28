@@ -6,6 +6,7 @@ import morgan from "morgan";
 import authRoutes from "./routes/auth.js";
 import featuresRoutes from "./routes/features.js";
 import { connectionsRouter, usersRouter } from "./routes/social.js";
+import challengeRoutes from "./routes/challenges.js";
 
 export function createApp() {
   const app = express();
@@ -27,6 +28,9 @@ export function createApp() {
   // US18 — Teammate's Connections implementation
   app.use("/api/users", usersRouter);
   app.use("/api/connections", connectionsRouter);
+
+  // US13 — Create Challenge
+  app.use("/api/challenges", challengeRoutes);
 
   return app;
 }
