@@ -42,6 +42,24 @@ export async function contributeArea(): Promise<Area> {
   return (await response.json()).area;
 }
 
+/**
+ * US22 "you are here": the phone's own position, for the blue dot on the map.
+ * Never asks for permission (returns null unless it was already given) and is
+ * never sent anywhere — it only lives on this phone while the map is open.
+ */
+export async function getMyPositionIfAllowed(): Promise<{ latitude: number; longitude: number } | null> {
+  try {
+    if (!(await Location.getForegroundPermissionsAsync()).granted) return null;
+    // A recent cached fix is instant; otherwise ask the phone for a fresh one.
+    const position =
+      (await Location.getLastKnownPositionAsync({ maxAge: 5 * 60 * 1000 })) ??
+      (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
+    return { latitude: position.coords.latitude, longitude: position.coords.longitude };
+  } catch {
+    return null; // location turned off, timed out, etc. — just don't show the dot
+  }
+}
+
 /** "24.85°N, 67.05°E" */
 export function formatArea(a: Area) {
   const lat = `${Math.abs(a.latitude).toFixed(2)}°${a.latitude >= 0 ? "N" : "S"}`;
